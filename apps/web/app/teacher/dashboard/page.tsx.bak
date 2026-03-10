@@ -2,25 +2,25 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import axios, { AxiosError } from "axios";
+import axios from "axios";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
 
-interface User { id: string; name: string; email: string; role: string }
 interface Exam {
   id: string;
   title: string;
   description: string;
   isActive: boolean;
-  durationMin: number;
   createdAt: string;
-  _count?: { questions: number; attempts: number };
+  _count?: {
+    questions: number;
+    attempts: number;
+  };
 }
 
 export default function TeacherDashboard() {
   const router = useRouter();
-
-  const [user, setUser] = useState<User | null>(null);
+  
   const [exams, setExams] = useState<Exam[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -30,44 +30,40 @@ export default function TeacherDashboard() {
   const [startTime, setStartTime] = useState("");
   const [endTime, setEndTime] = useState("");
   const [durationMin, setDurationMin] = useState(60);
-  const [createError, setCreateError] = useState("");
+
   const [creating, setCreating] = useState(false);
 
   useEffect(() => {
     const token = localStorage.getItem("token");
-    if (!token) {
       router.push("/auth/teacher/login");
       return;
     }
-    const stored = localStorage.getItem("user");
-    if (stored) setUser(JSON.parse(stored));
 
-    async function fetchData() {
+    async function fetchExams() {
       try {
-        const headers = { Authorization: `Bearer ${token}` };
-        const [meRes, examsRes] = await Promise.all([
-          axios.get<User>(`${API_URL}/api/me`, { headers }),
-          axios.get<Exam[]>(`${API_URL}/api/getExams`, { headers }),
-        ]);
-        setUser(meRes.data);
-        setExams(examsRes.data);
+        const { data } = await axios.get<Exam[]>(`${API_URL}/api/getExams`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        setExams(data);
       } catch (err) {
-        console.error("Failed to fetch dashboard data", err);
+        console.error("Failed to fetch exams", err);
         setError("Failed to load dashboard data.");
       } finally {
         setLoading(false);
       }
     }
-    fetchData();
+
+    fetchExams();
   }, [router]);
 
   const handleCreateExam = async (e: React.FormEvent) => {
     e.preventDefault();
-    setCreateError("");
     setCreating(true);
+    
     try {
       const token = localStorage.getItem("token");
-      const { data } = await axios.post(
+      const { data } = 
+      await axios.post(
         `${API_URL}/api/createExam`,
         {
           title,
@@ -75,40 +71,25 @@ export default function TeacherDashboard() {
           startTime: new Date(startTime).toISOString(),
           endTime: new Date(endTime).toISOString(),
           durationMin: Number(durationMin),
-          isActive: false,
+          isActive: false, // Default to draft
         },
-        { headers: { Authorization: `Bearer ${token}` } },
+        {
+          headers: { Authorization: `Bearer ${token}` }
+        }
       );
+      
       router.push(`/teacher/exams?examId=${data.id}`);
     } catch (err) {
-      const axiosErr = err as AxiosError<{ error?: string; errors?: Record<string, string[]> }>;
-      const d = axiosErr.response?.data;
-      if (d?.errors) setCreateError(Object.values(d.errors).flat().join(" "));
-      else setCreateError(d?.error ?? "Failed to create exam. Please try again.");
+      console.error("Failed to create exam", err);
+      alert("Failed to create exam. Please check your inputs.");
     } finally {
       setCreating(false);
     }
   };
 
-  const handleGoLive = async (examId: string) => {
-    try {
-      const token = localStorage.getItem("token");
-      await axios.patch(
-        `${API_URL}/api/exams/${examId}`,
-        { isActive: true },
-        { headers: { Authorization: `Bearer ${token}` } },
-      );
-      setExams((prev) =>
-        prev.map((e) => (e.id === examId ? { ...e, isActive: true } : e)),
-      );
-    } catch {
-      // silent
-    }
-  };
-
   const totalExams = exams.length;
-  const activeSessions = exams.filter((e) => e.isActive).length;
-  const drafts = exams.filter((e) => !e.isActive).length;
+  const activeSessions = exams.filter(e => e.isActive).length;
+  const drafts = exams.filter(e => !e.isActive).length;
 
   return (
     <div className="flex h-screen overflow-hidden bg-background-light dark:bg-background-dark text-slate-900 dark:text-slate-100">
@@ -170,27 +151,17 @@ export default function TeacherDashboard() {
             <span className="material-symbols-outlined">settings</span>
             <span>Settings</span>
           </a>
-          <div className="mt-4 flex items-center justify-between px-3 py-2 bg-slate-50 dark:bg-slate-800/50 rounded-lg border border-primary/5">
-            <div className="flex items-center gap-3 overflow-hidden">
-              <div className="h-8 w-8 shrink-0 rounded-full bg-secondary/30 flex items-center justify-center text-primary font-bold text-sm">
-                {user?.name?.[0]?.toUpperCase() ?? "T"}
-              </div>
-              <div className="text-sm overflow-hidden flex-1">
-                <p className="font-bold truncate">{user?.name ?? "Teacher"}</p>
-                <p className="text-xs text-slate-500">{user?.role ?? "FACULTY"}</p>
-              </div>
+          <div className="mt-4 flex items-center gap-3 px-3 py-2">
+            <div className="h-8 w-8 rounded-full bg-secondary/30 overflow-hidden">
+              <img
+                alt="Profile"
+                src="https://lh3.googleusercontent.com/aida-public/AB6AXuD3mjdbwbm74U2g9yQk0fBy5ZRzejAHhWGvMleclUwTxPOzHZn-Psp7pEps3H3t0vB3f0iL1_TldoO5RHXySEDAQXVwEklGoUTCyzQkaTmRm9JcvaSZTe-ZxuV5T1mxOKpj1FH0zzvpQ60yuWeUfMB9MKN6wSyQaApAsXa8H113zWK1p4OjnsOSOMrw-h5o2rMfZcRw9mDUnMaJARrwESuMrYrcLI7huxlqm945bQTmkRhi8euXUHdB8L6YUY3stvoq-o8zS1tCyg9w"
+              />
             </div>
-            <button 
-              onClick={() => {
-                localStorage.removeItem("token");
-                localStorage.removeItem("user");
-                router.push("/auth/teacher/login");
-              }}
-              className="text-slate-400 hover:text-red-500 transition-colors p-1"
-              title="Sign Out"
-            >
-              <span className="material-symbols-outlined text-[20px]">logout</span>
-            </button>
+            <div className="text-sm">
+              <p className="font-bold">Dr. Smith</p>
+              <p className="text-xs text-slate-500">Computer Science</p>
+            </div>
           </div>
         </div>
       </aside>
@@ -326,7 +297,7 @@ export default function TeacherDashboard() {
                       onChange={(e) => setDurationMin(Number(e.target.value))}
                     />
                   </div>
-                  <button
+                  <button 
                     type="submit"
                     disabled={creating}
                     className="w-full flex items-center justify-center gap-2 py-3 bg-primary hover:bg-primary/90 text-white rounded-lg font-bold transition-all shadow-lg shadow-primary/20 disabled:opacity-70"
@@ -340,12 +311,6 @@ export default function TeacherDashboard() {
                     )}
                     Continue
                   </button>
-                  {createError && (
-                    <p className="text-red-600 dark:text-red-400 text-sm font-medium flex items-center gap-1 mt-1">
-                      <span className="material-symbols-outlined text-base">error</span>
-                      {createError}
-                    </p>
-                  )}
                 </form>
               </section>
 
@@ -379,10 +344,7 @@ export default function TeacherDashboard() {
                               </p>
                             </div>
                           </div>
-                          <button
-                            onClick={() => handleGoLive(exam.id)}
-                            className="px-4 py-2 bg-secondary hover:bg-primary text-white text-sm font-bold rounded-lg transition-colors flex items-center gap-2 shrink-0"
-                          >
+                          <button className="px-4 py-2 bg-secondary hover:bg-primary text-white text-sm font-bold rounded-lg transition-colors flex items-center gap-2">
                             <span className="material-symbols-outlined text-[18px]">
                               play_arrow
                             </span>
@@ -409,48 +371,66 @@ export default function TeacherDashboard() {
                 Active Proctored Sessions
               </h3>
               <div className="bg-white dark:bg-slate-800 rounded-xl border border-primary/10 shadow-sm overflow-hidden">
-                {exams.filter((e) => e.isActive).length === 0 ? (
-                  <div className="p-8 text-center text-slate-400">
-                    <span className="material-symbols-outlined text-3xl block mb-2">podcasts</span>
-                    No active sessions. Go live on a draft exam to start proctoring.
-                  </div>
-                ) : (
-                  <table className="w-full text-left">
-                    <thead className="bg-primary/5 text-primary text-sm uppercase tracking-wider font-bold">
-                      <tr>
-                        <th className="px-6 py-4">Session Name</th>
-                        <th className="px-6 py-4">Attempts</th>
-                        <th className="px-6 py-4">Status</th>
-                        <th className="px-6 py-4">Duration</th>
-                        <th className="px-6 py-4">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-primary/5">
-                      {exams.filter((e) => e.isActive).map((exam) => (
-                        <tr key={exam.id}>
-                          <td className="px-6 py-4 font-medium">{exam.title}</td>
-                          <td className="px-6 py-4 text-slate-500">
-                            {exam._count?.attempts ?? 0} Attempt{(exam._count?.attempts ?? 0) !== 1 ? "s" : ""}
-                          </td>
-                          <td className="px-6 py-4">
-                            <span className="px-2 py-1 rounded-full bg-green-100 text-green-700 text-xs font-bold uppercase">
-                              Live
-                            </span>
-                          </td>
-                          <td className="px-6 py-4 text-slate-500">{exam.durationMin} min</td>
-                          <td className="px-6 py-4">
-                            <a
-                              href={`/teacher/exams?examId=${exam.id}`}
-                              className="text-primary font-bold text-sm hover:underline"
-                            >
-                              View
-                            </a>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                )}
+                <table className="w-full text-left">
+                  <thead className="bg-primary/5 text-primary text-sm uppercase tracking-wider font-bold">
+                    <tr>
+                      <th className="px-6 py-4">Session Name</th>
+                      <th className="px-6 py-4">Students</th>
+                      <th className="px-6 py-4">Status</th>
+                      <th className="px-6 py-4">Integrity Score</th>
+                      <th className="px-6 py-4">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-primary/5">
+                    {/* Hardcoded static example rows for now since there's no active proctored API */}
+                    <tr>
+                      <td className="px-6 py-4 font-medium">
+                        CS101: Morning Batch
+                      </td>
+                      <td className="px-6 py-4 text-slate-500">42 / 45 Active</td>
+                      <td className="px-6 py-4">
+                        <span className="px-2 py-1 rounded-full bg-green-100 text-green-700 text-xs font-bold uppercase">
+                          Live
+                        </span>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="w-full bg-slate-200 rounded-full h-2 max-w-[100px]">
+                          <div
+                            className="bg-green-500 h-2 rounded-full"
+                            style={{ width: "95%" }}
+                          ></div>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <button className="text-primary font-bold text-sm hover:underline">
+                          View Feed
+                        </button>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td className="px-6 py-4 font-medium">Algo Design 202</td>
+                      <td className="px-6 py-4 text-slate-500">28 / 30 Active</td>
+                      <td className="px-6 py-4">
+                        <span className="px-2 py-1 rounded-full bg-green-100 text-green-700 text-xs font-bold uppercase">
+                          Live
+                        </span>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="w-full bg-slate-200 rounded-full h-2 max-w-[100px]">
+                          <div
+                            className="bg-yellow-500 h-2 rounded-full"
+                            style={{ width: "72%" }}
+                          ></div>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <button className="text-primary font-bold text-sm hover:underline">
+                          View Feed
+                        </button>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
               </div>
             </div>
           </>

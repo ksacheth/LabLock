@@ -1,72 +1,10 @@
-import React from "react";
-import { Lexend } from "next/font/google";
-
-// Optimize font loading with Next.js
-const lexend = Lexend({ subsets: ["latin"] });
+import TeacherNavbar from "../../components/TeacherNavbar";
 
 export default function ProctoringDashboard() {
   return (
-    <div className={`min-h-screen bg-background-light dark:bg-background-dark text-slate-900 dark:text-slate-100 ${lexend.className}`}>
-      {/* Material Symbols Import */}
-      <link
-        href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap"
-        rel="stylesheet"
-      />
-
+    <div className="min-h-screen bg-background-light dark:bg-background-dark text-slate-900 dark:text-slate-100">
       <div className="relative flex h-auto min-h-screen w-full flex-col overflow-x-hidden">
-        {/* Top Navigation Bar */}
-        <header className="flex items-center justify-between whitespace-nowrap border-b border-solid border-primary/10 bg-white dark:bg-background-dark px-6 md:px-10 py-3 sticky top-0 z-50">
-          <div className="flex items-center gap-8">
-            <div className="flex items-center gap-4 text-primary">
-              <div className="size-8 flex items-center justify-center bg-primary text-white rounded-lg">
-                <span className="material-symbols-outlined">shield_person</span>
-              </div>
-              <div className="flex flex-col">
-                <h2 className="text-primary text-lg font-bold leading-tight tracking-tight">
-                  NITK Proctoring
-                </h2>
-                <p className="text-[10px] uppercase tracking-widest font-semibold opacity-70">
-                  Dept. of IT
-                </p>
-              </div>
-            </div>
-            <nav className="hidden lg:flex items-center gap-9">
-              <a className="text-slate-600 dark:text-slate-400 hover:text-primary dark:hover:text-accent text-sm font-medium transition-colors" href="#">
-                Dashboard
-              </a>
-              <a className="text-primary dark:text-accent text-sm font-bold border-b-2 border-primary dark:border-accent pb-1" href="#">
-                Exams
-              </a>
-              <a className="text-slate-600 dark:text-slate-400 hover:text-primary dark:hover:text-accent text-sm font-medium transition-colors" href="#">
-                Reports
-              </a>
-              <a className="text-slate-600 dark:text-slate-400 hover:text-primary dark:hover:text-accent text-sm font-medium transition-colors" href="#">
-                Settings
-              </a>
-            </nav>
-          </div>
-          <div className="flex flex-1 justify-end gap-4 items-center">
-            <div className="hidden md:flex items-center bg-primary/5 dark:bg-white/5 rounded-lg px-3 py-1.5 border border-primary/10">
-              <span className="material-symbols-outlined text-slate-400 text-xl">
-                search
-              </span>
-              <input
-                className="bg-transparent border-none focus:ring-0 text-sm w-48 placeholder:text-slate-400"
-                placeholder="Search students..."
-                type="text"
-              />
-            </div>
-            <button className="relative p-2 text-slate-600 hover:bg-primary/5 rounded-full transition-colors">
-              <span className="material-symbols-outlined">notifications</span>
-              <span className="absolute top-2 right-2 flex h-2 w-2 rounded-full bg-red-500"></span>
-            </button>
-            <div
-              className="h-10 w-10 rounded-full border-2 border-primary/20 bg-cover bg-center overflow-hidden"
-              data-alt="User profile avatar of a faculty member"
-              style={{ backgroundImage: 'url("https://lh3.googleusercontent.com/aida-public/AB6AXuA81XrNspiSbAx7fqfNyRMPLDcvLlXGFR7mmpjNdMLlm2viLHOyl4DvwY_NhGdv_ReBDooIkWEDTzPWvY-c2N1YI-tEnUdxevGrAQS6U_CW4W0i4MPjhY4xrtOwSHRcl621Bb14oNyh_egK8DEEW5BJYQgiFNvjSwhLM-jvpb2QxAgx8Q2GwEIunGmUkegdNTkjKlL57b3rAR9Nb3SIy9BuU5RbOfdqJeXN1IQXepgCD6iP9ZtNjOEZCUexQ9l8JS62B46Gy-4MfoQS")' }}
-            ></div>
-          </div>
-        </header>
+        <TeacherNavbar activePage="reports" />
 
         <main className="flex-1 max-w-7xl mx-auto w-full px-4 md:px-8 py-6">
           {/* Breadcrumbs */}
@@ -96,7 +34,9 @@ export default function ProctoringDashboard() {
                 Exam Results & Leaderboard
               </h1>
               <p className="text-slate-500 dark:text-slate-400 flex items-center gap-2">
-                <span className="material-symbols-outlined text-sm">school</span>
+                <span className="material-symbols-outlined text-sm">
+                  school
+                </span>
                 Department of Information Technology, NITK Surathkal
               </p>
             </div>
@@ -141,13 +81,17 @@ export default function ProctoringDashboard() {
                   Highest Marks
                 </p>
                 <span className="p-2 bg-accent/10 text-primary rounded-lg">
-                  <span className="material-symbols-outlined">emoji_events</span>
+                  <span className="material-symbols-outlined">
+                    emoji_events
+                  </span>
                 </span>
               </div>
               <p className="text-3xl font-bold text-slate-900 dark:text-white">
                 98.5<span className="text-lg text-slate-400">/100</span>
               </p>
-              <p className="text-xs text-slate-400 mt-2">Achieved by 2 students</p>
+              <p className="text-xs text-slate-400 mt-2">
+                Achieved by 2 students
+              </p>
             </div>
             <div className="bg-white dark:bg-slate-800 p-6 rounded-xl border border-primary/10 shadow-sm">
               <div className="flex justify-between items-start mb-4">
@@ -487,14 +431,25 @@ export default function ProctoringDashboard() {
               </p>
             </div>
             <div className="flex items-center gap-6">
-              <a className="text-slate-400 hover:text-primary transition-colors" href="#">
+              <a
+                className="text-slate-400 hover:text-primary transition-colors"
+                href="#"
+              >
                 <span className="material-symbols-outlined">help</span>
               </a>
-              <a className="text-slate-400 hover:text-primary transition-colors" href="#">
+              <a
+                className="text-slate-400 hover:text-primary transition-colors"
+                href="#"
+              >
                 <span className="material-symbols-outlined">policy</span>
               </a>
-              <a className="text-slate-400 hover:text-primary transition-colors" href="#">
-                <span className="material-symbols-outlined">contact_support</span>
+              <a
+                className="text-slate-400 hover:text-primary transition-colors"
+                href="#"
+              >
+                <span className="material-symbols-outlined">
+                  contact_support
+                </span>
               </a>
             </div>
           </div>
