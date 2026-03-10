@@ -1,43 +1,24 @@
+/* 1. External Font Imports FIRST */
+@import url('https://fonts.googleapis.com/css2?family=Lexend:wght@300;400;500;600;700;800;900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap');
+
+/* 2. Tailwind Import SECOND */
 @import "tailwindcss";
 
+/* 3. Theme Configuration THIRD */
 @theme {
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-primary: #355872;
+  --color-secondary: #7AAACE;
+  --color-accent: #9CD5FF;
+  --color-accent-blue: #7AAACE;
+  --color-light-blue: #9CD5FF;
+  --color-cream: #F7F8F0;
+  --color-background-light: #F7F8F0;
+  --color-background-dark: #16191c;
+  --font-display: "Lexend", "sans-serif";
 }
 
-@layer base {
-  html,
-  body {
-    max-width: 100vw;
-    overflow-x: hidden;
-  }
-
-  * {
-    box-sizing: border-box;
-    padding: 0;
-    margin: 0;
-  }
-
-  a {
-    color: inherit;
-    text-decoration: none;
-  }
-
-  .imgDark {
-    display: none;
-  }
-
-  @media (prefers-color-scheme: dark) {
-    html {
-      color-scheme: dark;
-    }
-
-    .imgLight {
-      display: none;
-    }
-
-    .imgDark {
-      display: unset;
-    }
-  }
+/* 4. Custom Utility Classes LAST */
+.material-symbols-outlined {
+  font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
 }
