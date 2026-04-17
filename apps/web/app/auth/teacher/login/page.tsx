@@ -7,6 +7,7 @@ import axios, { AxiosError } from "axios";
 import PublicHeader from "../../../components/PublicHeader";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
+const REQUIRED_ROLE = "FACULTY";
 
 export default function TeacherLogin() {
   const router = useRouter();
@@ -24,7 +25,7 @@ export default function TeacherLogin() {
     try {
       const { data } = await axios.post<{ token: string; user: { role: string } }>(
         `${API_URL}/api/signin`,
-        { email, password },
+        { email, password, expectedRole: REQUIRED_ROLE },
       );
 
       localStorage.setItem("token", data.token);

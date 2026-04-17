@@ -12,7 +12,7 @@ export default function LabProctor() {
             <div className="layout-content-container flex flex-col max-w-[1024px] flex-1">
               <div className="text-center mb-12">
                 <h1 className="text-slate-900 dark:text-slate-100 text-4xl lg:text-5xl font-extrabold leading-tight mb-4">
-                  Welcome to the Future of Proctoring
+                  Welcome to the Future of Online Examination
                 </h1>
                 <p className="text-primary/70 dark:text-slate-400 text-lg max-w-2xl mx-auto">
                   Secure, efficient, and transparent lab monitoring. Select your
@@ -20,7 +20,7 @@ export default function LabProctor() {
                 </p>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-[860px] mx-auto w-full">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-[1320px] mx-auto w-full">
                 <div className="group relative flex flex-col bg-white dark:bg-slate-800 p-8 rounded-xl border-2 border-transparent hover:border-accent-blue shadow-sm hover:shadow-xl transition-all duration-300">
                   <div className="mb-6 flex items-center justify-center w-16 h-16 rounded-full bg-light-blue/20 text-primary">
                     <span className="material-symbols-outlined text-4xl">
@@ -76,6 +76,32 @@ export default function LabProctor() {
                     >
                       Register as Educator
                     </Link>
+                  </div>
+                </div>
+
+                <div className="group relative flex flex-col bg-white dark:bg-slate-800 p-8 rounded-xl border-2 border-transparent hover:border-primary shadow-sm hover:shadow-xl transition-all duration-300">
+                  <div className="mb-6 flex items-center justify-center w-16 h-16 rounded-full bg-primary/10 text-primary">
+                    <span className="material-symbols-outlined text-4xl">
+                      admin_panel_settings
+                    </span>
+                  </div>
+                  <h3 className="text-2xl font-bold text-slate-900 dark:text-slate-100 mb-2">
+                    I am an Admin
+                  </h3>
+                  <p className="text-slate-500 dark:text-slate-400 mb-8 leading-relaxed">
+                    Provision departments, manage academic structure, and
+                    control access across the examination platform.
+                  </p>
+                  <div className="mt-auto space-y-3">
+                    <Link
+                      href="/auth/admin/login"
+                      className="w-full flex items-center justify-center rounded-lg h-14 bg-primary text-white text-lg font-bold hover:bg-primary/90 transition-colors"
+                    >
+                      Admin Login
+                    </Link>
+                    <p className="rounded-lg border border-primary/10 bg-cream px-4 py-3 text-center text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-900/40 dark:text-slate-400">
+                      Admin accounts are provisioned by the system.
+                    </p>
                   </div>
                 </div>
               </div>

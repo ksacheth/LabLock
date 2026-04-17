@@ -7,9 +7,9 @@ import axios, { AxiosError } from "axios";
 import PublicHeader from "../../../components/PublicHeader";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
-const REQUIRED_ROLE = "STUDENT";
+const REQUIRED_ROLE = "ADMIN";
 
-export default function StudentLogin() {
+export default function AdminLogin() {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -31,7 +31,7 @@ export default function StudentLogin() {
       localStorage.setItem("token", data.token);
       localStorage.setItem("user", JSON.stringify(data.user));
 
-      router.push("/student/dashboard");
+      router.push("/admin/dashboard");
     } catch (err) {
       const axiosErr = err as AxiosError<{ error?: string }>;
       setError(
@@ -49,22 +49,20 @@ export default function StudentLogin() {
       <main className="flex flex-1 justify-center items-center py-12 px-6">
         <div className="w-full max-w-md">
           <div className="bg-white dark:bg-slate-800 rounded-2xl border border-primary/10 shadow-sm p-8">
-            {/* Icon + Title */}
             <div className="flex flex-col items-center mb-8">
-              <div className="w-16 h-16 rounded-full bg-light-blue/20 text-primary flex items-center justify-center mb-4">
+              <div className="w-16 h-16 rounded-full bg-primary/10 text-primary flex items-center justify-center mb-4">
                 <span className="material-symbols-outlined text-4xl">
-                  school
+                  admin_panel_settings
                 </span>
               </div>
               <h1 className="text-2xl font-extrabold text-slate-900 dark:text-slate-100">
-                Student Login
+                Admin Login
               </h1>
-              <p className="text-slate-500 dark:text-slate-400 text-sm mt-1">
-                Access your lab exams and results
+              <p className="text-slate-500 dark:text-slate-400 text-sm mt-1 text-center">
+                Manage departments, batches, and platform-wide access
               </p>
             </div>
 
-            {/* Error Banner */}
             {error && (
               <div className="mb-6 flex items-start gap-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 rounded-lg px-4 py-3 text-sm">
                 <span className="material-symbols-outlined text-base mt-0.5 shrink-0">
@@ -74,14 +72,13 @@ export default function StudentLogin() {
               </div>
             )}
 
-            {/* Form */}
             <form onSubmit={handleSubmit} className="space-y-5">
               <div>
                 <label
                   htmlFor="email"
                   className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1.5"
                 >
-                  NITK Email
+                  Admin Email
                 </label>
                 <div className="relative">
                   <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xl pointer-events-none">
@@ -92,7 +89,7 @@ export default function StudentLogin() {
                     type="email"
                     required
                     autoComplete="email"
-                    placeholder="you@nitk.edu.in"
+                    placeholder="admin@example.com"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     className="w-full pl-10 pr-4 py-3 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary transition-colors"
@@ -154,15 +151,9 @@ export default function StudentLogin() {
               </button>
             </form>
 
-            {/* Footer Links */}
-            <div className="mt-6 text-center text-sm text-slate-500 dark:text-slate-400">
-              Don&apos;t have an account?{" "}
-              <Link
-                href="/auth/student/signup"
-                className="text-primary font-semibold hover:underline"
-              >
-                Create Student Account
-              </Link>
+            <div className="mt-6 rounded-lg border border-primary/10 bg-cream px-4 py-3 text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-900/40 dark:text-slate-400">
+              Admin access is provisioned centrally. If your credentials do not
+              work, reseed or update the admin account first.
             </div>
             <div className="mt-3 text-center text-sm text-slate-500 dark:text-slate-400">
               <Link

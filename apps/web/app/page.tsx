@@ -17,12 +17,10 @@ export default function NITKProctoringPage() {
                       Integrity Redefined
                     </span>
                     <h1 className="text-primary text-4xl md:text-6xl font-black leading-tight tracking-tight">
-                      Secure Online Proctoring for NITK Excellence
+                      Secure Online Examination for NITK Excellence
                     </h1>
                     <p className="text-slate-600 dark:text-slate-400 text-lg md:text-xl font-normal leading-relaxed max-w-[540px]">
-                      Experience the next generation of academic integrity with
-                      AI-enhanced lab proctoring. Trusted by top-tier
-                      universities to ensure fair outcomes.
+                      Experience the next generation of academic integrity with centeralised lab Examinator website.
                     </p>
                   </div>
                   <div className="flex flex-wrap gap-4">
@@ -32,9 +30,9 @@ export default function NITKProctoringPage() {
                     >
                       Get Started
                     </Link>
-                    <button className="flex min-w-[160px] cursor-pointer items-center justify-center rounded-xl h-14 px-8 bg-accent/20 text-primary text-lg font-bold hover:bg-accent/30 transition-all border border-accent/30">
+                    {/* <button className="flex min-w-[160px] cursor-pointer items-center justify-center rounded-xl h-14 px-8 bg-accent/20 text-primary text-lg font-bold hover:bg-accent/30 transition-all border border-accent/30">
                       Watch Demo
-                    </button>
+                    </button> */}
                   </div>
                 </div>
               </div>
@@ -62,9 +60,9 @@ export default function NITKProctoringPage() {
                     <button className="flex min-w-[200px] cursor-pointer items-center justify-center rounded-xl h-14 px-8 bg-white text-primary text-lg font-bold hover:bg-background-light shadow-xl transition-all">
                       Create Free Account
                     </button>
-                    <button className="flex min-w-[200px] cursor-pointer items-center justify-center rounded-xl h-14 px-8 bg-primary border border-white/30 text-white text-lg font-bold hover:bg-white/10 transition-all">
+                    {/* <button className="flex min-w-[200px] cursor-pointer items-center justify-center rounded-xl h-14 px-8 bg-primary border border-white/30 text-white text-lg font-bold hover:bg-white/10 transition-all">
                       Contact Sales
-                    </button>
+                    </button> */}
                   </div>
                 </div>
               </div>
@@ -72,7 +70,7 @@ export default function NITKProctoringPage() {
           </div>
         </main>
 
-        <footer className="bg-white dark:bg-background-dark border-t border-primary/5 px-6 md:px-20 py-12">
+        {/* <footer className="bg-white dark:bg-background-dark border-t border-primary/5 px-6 md:px-20 py-12">
           <div className="max-w-[1200px] mx-auto grid grid-cols-1 md:grid-cols-4 gap-12">
             <div className="flex flex-col gap-4">
               <div className="flex items-center gap-2 text-primary">
@@ -197,10 +195,10 @@ export default function NITKProctoringPage() {
             </div>
           </div>
           <div className="max-w-[1200px] mx-auto mt-12 pt-8 border-t border-primary/5 flex flex-col md:flex-row justify-between items-center gap-4">
-            {/* <p className="text-slate-400 text-xs">
+            <p className="text-slate-400 text-xs">
               © 2024 National Institute of Technology Karnataka. All rights
               reserved.
-            </p> */}
+            </p>
             <div className="flex gap-6">
               <Link
                 href="#"
@@ -218,7 +216,7 @@ export default function NITKProctoringPage() {
               </Link>
             </div>
           </div>
-        </footer>
+        </footer> */}
       </div>
     </div>
   );

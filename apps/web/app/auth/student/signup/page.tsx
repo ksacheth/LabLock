@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import axios, { AxiosError } from "axios";
@@ -8,14 +8,72 @@ import PublicHeader from "../../../components/PublicHeader";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
 
+interface Department {
+  id: string;
+  name: string;
+  code: string;
+}
+
+interface Batch {
+  id: string;
+  label: string;
+  yearOfStudy: number;
+  intakeYear: number;
+  departmentId: string;
+}
+
 export default function StudentSignup() {
   const router = useRouter();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [departmentId, setDepartmentId] = useState("");
+  const [batchId, setBatchId] = useState("");
+  const [rollNumber, setRollNumber] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+
+  const [departments, setDepartments] = useState<Department[]>([]);
+  const [batches, setBatches] = useState<Batch[]>([]);
+  const [loadingDepts, setLoadingDepts] = useState(true);
+
+  // Fetch departments on mount
+  useEffect(() => {
+    async function fetchDepartments() {
+      try {
+        const res = await axios.get<Department[]>(`${API_URL}/api/departments`);
+        setDepartments(res.data);
+      } catch {
+        console.error("Failed to load departments");
+      } finally {
+        setLoadingDepts(false);
+      }
+    }
+    fetchDepartments();
+  }, []);
+
+  // Fetch batches when department changes
+  useEffect(() => {
+    if (!departmentId) {
+      setBatches([]);
+      setBatchId("");
+      return;
+    }
+
+    async function fetchBatches() {
+      try {
+        const res = await axios.get<Batch[]>(
+          `${API_URL}/api/batches?departmentId=${departmentId}`
+        );
+        setBatches(res.data);
+      } catch {
+        console.error("Failed to load batches");
+      }
+    }
+    fetchBatches();
+    setBatchId(""); // Reset batch when department changes
+  }, [departmentId]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -23,10 +81,18 @@ export default function StudentSignup() {
     setLoading(true);
 
     try {
-      await axios.post(`${API_URL}/api/signup`, { name, email, password });
+      const payload: Record<string, string> = { name, email, password };
+      if (departmentId) payload.departmentId = departmentId;
+      if (batchId) payload.batchId = batchId;
+      if (rollNumber.trim()) payload.rollNumber = rollNumber.trim();
+
+      await axios.post(`${API_URL}/api/signup`, payload);
       router.push("/auth/student/login?registered=1");
     } catch (err) {
-      const axiosErr = err as AxiosError<{ error?: string; errors?: Record<string, string[]> }>;
+      const axiosErr = err as AxiosError<{
+        error?: string;
+        errors?: Record<string, string[]>;
+      }>;
       const data = axiosErr.response?.data;
       if (data?.errors) {
         const messages = Object.values(data.errors).flat().join(" ");
@@ -38,6 +104,15 @@ export default function StudentSignup() {
       setLoading(false);
     }
   }
+
+  const inputClasses =
+    "w-full pl-10 pr-4 py-3 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary transition-colors";
+
+  const selectClasses =
+    "w-full pl-10 pr-4 py-3 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary transition-colors appearance-none";
+
+  const labelClasses =
+    "block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1.5";
 
   return (
     <div className="bg-background-light dark:bg-background-dark font-display text-slate-900 dark:text-slate-100 min-h-screen flex flex-col">
@@ -73,11 +148,9 @@ export default function StudentSignup() {
 
             {/* Form */}
             <form onSubmit={handleSubmit} className="space-y-5">
+              {/* Full Name */}
               <div>
-                <label
-                  htmlFor="name"
-                  className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1.5"
-                >
+                <label htmlFor="name" className={labelClasses}>
                   Full Name
                 </label>
                 <div className="relative">
@@ -92,16 +165,14 @@ export default function StudentSignup() {
                     placeholder="Your full name"
                     value={name}
                     onChange={(e) => setName(e.target.value)}
-                    className="w-full pl-10 pr-4 py-3 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary transition-colors"
+                    className={inputClasses}
                   />
                 </div>
               </div>
 
+              {/* Email */}
               <div>
-                <label
-                  htmlFor="email"
-                  className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1.5"
-                >
+                <label htmlFor="email" className={labelClasses}>
                   NITK Email
                 </label>
                 <div className="relative">
@@ -116,7 +187,7 @@ export default function StudentSignup() {
                     placeholder="you@nitk.edu.in"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    className="w-full pl-10 pr-4 py-3 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary transition-colors"
+                    className={inputClasses}
                   />
                 </div>
                 <p className="mt-1.5 text-xs text-slate-400">
@@ -124,11 +195,9 @@ export default function StudentSignup() {
                 </p>
               </div>
 
+              {/* Password */}
               <div>
-                <label
-                  htmlFor="password"
-                  className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1.5"
-                >
+                <label htmlFor="password" className={labelClasses}>
                   Password
                 </label>
                 <div className="relative">
@@ -157,6 +226,108 @@ export default function StudentSignup() {
                       {showPassword ? "visibility_off" : "visibility"}
                     </span>
                   </button>
+                </div>
+              </div>
+
+              {/* ── Academic Details Divider ── */}
+              <div className="relative pt-2">
+                <div className="absolute inset-0 flex items-center pt-2">
+                  <div className="w-full border-t border-slate-200 dark:border-slate-600" />
+                </div>
+                <div className="relative flex justify-center">
+                  <span className="bg-white dark:bg-slate-800 px-3 text-xs font-semibold uppercase tracking-[0.15em] text-slate-400">
+                    Academic Details
+                  </span>
+                </div>
+              </div>
+
+              {/* Department */}
+              <div>
+                <label htmlFor="department" className={labelClasses}>
+                  Department
+                </label>
+                <div className="relative">
+                  <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xl pointer-events-none">
+                    domain
+                  </span>
+                  <select
+                    id="department"
+                    value={departmentId}
+                    onChange={(e) => setDepartmentId(e.target.value)}
+                    disabled={loadingDepts}
+                    className={selectClasses}
+                  >
+                    <option value="">
+                      {loadingDepts
+                        ? "Loading departments..."
+                        : "Select your department"}
+                    </option>
+                    {departments.map((d) => (
+                      <option key={d.id} value={d.id}>
+                        {d.name} ({d.code})
+                      </option>
+                    ))}
+                  </select>
+                  <span className="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-xl pointer-events-none">
+                    expand_more
+                  </span>
+                </div>
+              </div>
+
+              {/* Batch — only shown when a department is selected */}
+              {departmentId && (
+                <div>
+                  <label htmlFor="batch" className={labelClasses}>
+                    Batch
+                  </label>
+                  <div className="relative">
+                    <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xl pointer-events-none">
+                      groups_2
+                    </span>
+                    <select
+                      id="batch"
+                      value={batchId}
+                      onChange={(e) => setBatchId(e.target.value)}
+                      className={selectClasses}
+                    >
+                      <option value="">Select your batch</option>
+                      {batches.map((b) => (
+                        <option key={b.id} value={b.id}>
+                          {b.label} (Year {b.yearOfStudy}, Intake{" "}
+                          {b.intakeYear})
+                        </option>
+                      ))}
+                    </select>
+                    <span className="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-xl pointer-events-none">
+                      expand_more
+                    </span>
+                  </div>
+                  {batches.length === 0 && (
+                    <p className="mt-1.5 text-xs text-amber-500">
+                      No batches available for this department yet.
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {/* Roll Number */}
+              <div>
+                <label htmlFor="rollNumber" className={labelClasses}>
+                  Roll Number
+                </label>
+                <div className="relative">
+                  <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xl pointer-events-none">
+                    tag
+                  </span>
+                  <input
+                    id="rollNumber"
+                    type="text"
+                    maxLength={20}
+                    placeholder="e.g. 22CS001"
+                    value={rollNumber}
+                    onChange={(e) => setRollNumber(e.target.value)}
+                    className={inputClasses}
+                  />
                 </div>
               </div>
 
