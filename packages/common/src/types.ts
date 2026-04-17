@@ -81,23 +81,64 @@ export const ExamSchema = z
       .max(2000, "Description must be at most 2000 characters")
       .optional(),
     startTime: z.coerce.date({ message: "startTime must be a valid date" }),
-    endTime: z.coerce.date({ message: "endTime must be a valid date" }),
+    endTime: z.coerce
+      .date({ message: "endTime must be a valid date" })
+      .optional(),
     durationMin: z
       .number({ message: "durationMin must be a number" })
       .int("durationMin must be an integer")
       .positive("durationMin must be positive"),
+    batchId: z.string().uuid("batchId must be a valid UUID"),
     isActive: z.boolean().default(false),
     accessCode: z
       .string()
       .max(50, "Access code must be at most 50 characters")
       .optional(),
   })
-  .refine((data) => data.endTime > data.startTime, {
+  .refine((data) => !data.endTime || data.endTime > data.startTime, {
     message: "endTime must be after startTime",
     path: ["endTime"],
   });
 
 export type ExamInput = z.infer<typeof ExamSchema>;
+
+export const UpdateExamSchema = z
+  .object({
+    title: z
+      .string()
+      .min(3, "Title must be at least 3 characters")
+      .max(200, "Title must be at most 200 characters")
+      .optional(),
+    description: z
+      .string()
+      .max(2000, "Description must be at most 2000 characters")
+      .optional(),
+    startTime: z.coerce
+      .date({ message: "startTime must be a valid date" })
+      .optional(),
+    endTime: z.coerce
+      .date({ message: "endTime must be a valid date" })
+      .optional(),
+    durationMin: z
+      .number({ message: "durationMin must be a number" })
+      .int("durationMin must be an integer")
+      .positive("durationMin must be positive")
+      .optional(),
+    isActive: z.boolean().optional(),
+    accessCode: z
+      .string()
+      .max(50, "Access code must be at most 50 characters")
+      .optional(),
+  })
+  .refine(
+    (data) => !data.startTime || !data.endTime || data.endTime > data.startTime,
+    {
+      message: "endTime must be after startTime",
+      path: ["endTime"],
+    },
+  );
+
+export type UpdateExamInput = z.infer<typeof UpdateExamSchema>;
 
 export const QuestionSchema = z.object({
   title: z
@@ -193,4 +234,11 @@ export const UserSchema = z.object({
     .string()
     .min(8, "Password must be at least 8 characters")
     .max(50, "Password must be at most 50 characters"),
+  departmentId: z.string().uuid("departmentId must be a valid UUID").optional(),
+  batchId: z.string().uuid("batchId must be a valid UUID").optional(),
+  rollNumber: z
+    .string()
+    .min(1, "Roll number cannot be empty")
+    .max(20, "Roll number must be at most 20 characters")
+    .optional(),
 });
