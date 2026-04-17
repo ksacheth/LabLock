@@ -73,3 +73,8 @@ The Lab Exam Proctoring System with an Online Compiler addresses key challenges 
 [![Database Schema](./assets/schema.svg)](https://dbdiagram.io/d/69a44b76a3f0aa31e1704d84)
 
 Click the diagram to view the interactive version.
+
+## Full Project Flow
+
+The end-to-end product flow Mermaid diagram lives in [docs/full-project-flow.md](./docs/full-project-flow.md).
+It reflects the current codebase and explicitly labels the planned pieces that are not implemented yet.
