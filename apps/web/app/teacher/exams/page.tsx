@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, Suspense } from "react";
+import React, { useEffect, useState, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import axios from "axios";
 import TeacherNavbar from "../../components/TeacherNavbar";
@@ -24,6 +24,58 @@ interface Question {
   memoryLimitKb: number;
   orderIndex: number;
   testCases?: TestCase[];
+}
+
+type PrepareTestCasesResult =
+  | { testCases: TestCase[] }
+  | { error: string };
+
+function prepareTestCasesForSave(
+  testCases: TestCase[],
+): PrepareTestCasesResult {
+  const normalizedCases: TestCase[] = [];
+
+  for (const [index, testCase] of testCases.entries()) {
+    const input = testCase.input.trim();
+    const expectedOutput = testCase.expectedOutput.trim();
+    const weight = Number(testCase.weight);
+    const rowNumber = index + 1;
+    const isCompletelyBlank = input === "" && expectedOutput === "";
+
+    if (isCompletelyBlank) {
+      if (testCase.id) {
+        return {
+          error: `Test case ${rowNumber} is empty. Remove it instead of saving it blank.`,
+        };
+      }
+      continue;
+    }
+
+    if (input === "") {
+      return { error: `Test case ${rowNumber} is missing input.` };
+    }
+
+    if (expectedOutput === "") {
+      return { error: `Test case ${rowNumber} is missing expected output.` };
+    }
+
+    if (!Number.isFinite(weight) || weight <= 0) {
+      return { error: `Test case ${rowNumber} must have a positive weight.` };
+    }
+
+    normalizedCases.push({
+      ...testCase,
+      input,
+      expectedOutput,
+      weight,
+    });
+  }
+
+  if (normalizedCases.length === 0) {
+    return { error: "Add at least one complete test case before saving." };
+  }
+
+  return { testCases: normalizedCases };
 }
 
 function ExamEditor() {
@@ -52,16 +104,7 @@ function ExamEditor() {
     { input: "", expectedOutput: "", isHidden: true, weight: 1.0 }
   ]);
 
-  useEffect(() => {
-    if (!examId) {
-      setLoading(false);
-      return;
-    }
-
-    fetchQuestions();
-  }, [examId]);
-
-  const fetchQuestions = async () => {
+  const fetchQuestions = React.useCallback(async () => {
     try {
       const token = localStorage.getItem("token");
       const { data } = await axios.get<Question[]>(`${API_URL}/api/exams/${examId}/questions`, {
@@ -78,7 +121,17 @@ function ExamEditor() {
     } finally {
       setLoading(false);
     }
-  };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [examId, activeIndex]);
+
+  useEffect(() => {
+    if (!examId) {
+      setLoading(false);
+      return;
+    }
+
+    fetchQuestions();
+  }, [examId, fetchQuestions]);
 
   const selectQuestion = (index: number, questionList: Question[] = questions) => {
     const q = questionList[index];
@@ -115,7 +168,7 @@ function ExamEditor() {
     ]);
   };
 
-  const updateTestCase = (index: number, field: keyof TestCase, value: any) => {
+  const updateTestCase = <K extends keyof TestCase>(index: number, field: K, value: TestCase[K]) => {
     const newCases = [...testCases];
     newCases[index] = { ...newCases[index], [field]: value } as TestCase;
     setTestCases(newCases);
@@ -130,10 +183,14 @@ function ExamEditor() {
       setSaveError("Title and description are required.");
       return;
     }
-    if (testCases.length === 0) {
-      setSaveError("At least one test case is required.");
+    const preparedTestCases = prepareTestCasesForSave(testCases);
+    if ("error" in preparedTestCases) {
+      setSaveError(preparedTestCases.error);
       return;
     }
+
+    const validTestCases = preparedTestCases.testCases;
+
     setSaveError("");
     setSaveSuccess(false);
     setSaving(true);
@@ -162,7 +219,7 @@ function ExamEditor() {
         questionId = qData.id;
         
         // Add Test Cases sequentially
-        for (const tc of testCases) {
+        for (const tc of validTestCases) {
           await axios.post(
             `${API_URL}/api/questions/${questionId}/testcases`,
             {
@@ -190,7 +247,7 @@ function ExamEditor() {
         );
 
         // Update Test Cases
-        for (const tc of testCases) {
+        for (const tc of validTestCases) {
           if (tc.id) {
             await axios.patch(`${API_URL}/api/testcases/${tc.id}`, {
               input: tc.input,
@@ -213,9 +270,21 @@ function ExamEditor() {
       setSaveSuccess(true);
       setTimeout(() => setSaveSuccess(false), 3000);
 
-    } catch (error: any) {
+    } catch (error) {
       console.error("Failed to save question", error);
-      setSaveError(error.response?.data?.error || "Failed to save question.");
+      if (axios.isAxiosError(error)) {
+        const data = error.response?.data as {
+          error?: string;
+          errors?: Record<string, string[]>;
+        } | undefined;
+        if (data?.errors) {
+          setSaveError(Object.values(data.errors).flat().join(" "));
+        } else {
+          setSaveError(data?.error || "Failed to save question.");
+        }
+      } else {
+        setSaveError("Failed to save question.");
+      }
     } finally {
       setSaving(false);
     }
@@ -232,8 +301,8 @@ function ExamEditor() {
         { headers: { Authorization: `Bearer ${token}` } },
       );
       router.push("/teacher/dashboard");
-    } catch (error: any) {
-      setSaveError(error.response?.data?.error || "Failed to publish exam.");
+    } catch (error) {
+      if (axios.isAxiosError(error)) { if (axios.isAxiosError(error)) { setSaveError(error.response?.data?.error || "Failed to publish exam."); } else { setSaveError("Failed to publish exam."); } } else { setSaveError("Failed to publish exam."); }
     } finally {
       setPublishing(false);
     }
@@ -256,7 +325,7 @@ function ExamEditor() {
   }
 
   return (
-    <div className="max-w-[1440px] mx-auto flex flex-col lg:flex-row h-[calc(100vh-64px)]">
+    <div className="max-w-360 mx-auto flex flex-col lg:flex-row h-[calc(100vh-64px)]">
       {/* Sidebar Navigation */}
       <aside className="w-full lg:w-80 border-r border-primary/10 bg-white dark:bg-background-dark p-6 flex flex-col gap-6 overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
         <div>
@@ -517,7 +586,7 @@ function ExamEditor() {
                           <input 
                             type="number" 
                             step="0.1"
-                            min="0"
+                            min="0.1"
                             value={tc.weight}
                             onChange={(e) => updateTestCase(idx, 'weight', Number(e.target.value))}
                             className="w-16 px-2 py-0.5 text-xs rounded border border-primary/10 bg-white dark:bg-slate-900 focus:ring-1 focus:ring-primary outline-none"

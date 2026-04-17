@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, Suspense } from "react";
+import React, { useEffect, useState, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import axios from "axios";
 import TeacherNavbar from "../../components/TeacherNavbar";
@@ -52,16 +52,7 @@ function ExamEditor() {
     { input: "", expectedOutput: "", isHidden: true, weight: 1.0 }
   ]);
 
-  useEffect(() => {
-    if (!examId) {
-      setLoading(false);
-      return;
-    }
-
-    fetchQuestions();
-  }, [examId]);
-
-  const fetchQuestions = async () => {
+  const fetchQuestions = React.useCallback(async () => {
     try {
       const token = localStorage.getItem("token");
       const { data } = await axios.get<Question[]>(`${API_URL}/api/exams/${examId}/questions`, {
@@ -78,7 +69,17 @@ function ExamEditor() {
     } finally {
       setLoading(false);
     }
-  };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [examId, activeIndex]);
+
+  useEffect(() => {
+    if (!examId) {
+      setLoading(false);
+      return;
+    }
+
+    fetchQuestions();
+  }, [examId, fetchQuestions]);
 
   const selectQuestion = (index: number, questionList: Question[] = questions) => {
     const q = questionList[index];
@@ -115,7 +116,7 @@ function ExamEditor() {
     ]);
   };
 
-  const updateTestCase = (index: number, field: keyof TestCase, value: any) => {
+  const updateTestCase = <K extends keyof TestCase>(index: number, field: K, value: TestCase[K]) => {
     const newCases = [...testCases];
     newCases[index] = { ...newCases[index], [field]: value } as TestCase;
     setTestCases(newCases);
@@ -213,9 +214,9 @@ function ExamEditor() {
       setSaveSuccess(true);
       setTimeout(() => setSaveSuccess(false), 3000);
 
-    } catch (error: any) {
+    } catch (error) {
       console.error("Failed to save question", error);
-      setSaveError(error.response?.data?.error || "Failed to save question.");
+      if (axios.isAxiosError(error)) { setSaveError(error.response?.data?.error || "Failed to save question."); } else { setSaveError("Failed to save question."); }
     } finally {
       setSaving(false);
     }
@@ -232,8 +233,8 @@ function ExamEditor() {
         { headers: { Authorization: `Bearer ${token}` } },
       );
       router.push("/teacher/dashboard");
-    } catch (error: any) {
-      setSaveError(error.response?.data?.error || "Failed to publish exam.");
+    } catch (error) {
+      if (axios.isAxiosError(error)) { if (axios.isAxiosError(error)) { setSaveError(error.response?.data?.error || "Failed to publish exam."); } else { setSaveError("Failed to publish exam."); } } else { setSaveError("Failed to publish exam."); }
     } finally {
       setPublishing(false);
     }
@@ -343,7 +344,7 @@ function ExamEditor() {
       </aside>
 
       {/* Main Content Area */}
-      <main className="flex-1 p-4 md:p-8 lg:p-12 max-w-5xl mx-auto w-full">
+      <main className="flex-1 p-4 md:p-8 lg:p-12 max-w-5xl mx-auto w-full overflow-y-auto">
         {activeIndex === -1 ? (
           <div className="flex-1 flex flex-col items-center justify-center h-full text-slate-400 min-h-[50vh]">
             <span className="material-symbols-outlined text-6xl mb-4 opacity-50">post_add</span>
