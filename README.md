@@ -34,16 +34,20 @@ By integrating both components, the system creates a controlled and fair examina
 ## 5. Key Features
 
 - Web-based coding interface with real-time code execution.
+- Role-based portals for students, faculty, and administrators.
+- Self-service faculty registration gated by administrator approval.
+- Faculty exam authoring with weighted, hidden or visible test cases and flexible output matching.
+- Automated grading with per-question weighted scoring and faculty result dashboards.
 - Controlled exam access with restricted actions.
-- Continuous activity monitoring and logging.
+- Continuous activity monitoring with violation logging.
 - Reduced dependency on local machine configuration.
 
 ## 6. Tech Stack
 The system is built using the following technologies to ensure scalability, performance, and security:
 
-- Frontend: React (dynamic and responsive user interface).
-- Backend: Express.js (Node.js framework for API requests and business logic).
-- Database: PostgreSQL (robust structured storage for student records and exam logs).
+- Frontend: Next.js with React (dynamic and responsive user interface).
+- Backend: Express running on the Bun runtime (API requests and business logic).
+- Database: PostgreSQL with Prisma ORM (robust structured storage for student records and exam logs).
 
 ## 7. Advantages
 
