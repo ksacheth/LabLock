@@ -382,7 +382,7 @@ export default function TeacherResultsPage() {
 
         <footer className="mt-auto border-t border-primary/10 bg-white px-8 py-6 text-center text-sm text-slate-500 md:text-left">
           <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-4 md:flex-row">
-            <p>LabProctor — Faculty results</p>
+            <p>LabLock — Faculty results</p>
           </div>
         </footer>
       </div>

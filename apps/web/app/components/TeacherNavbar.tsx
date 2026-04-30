@@ -28,7 +28,7 @@ export default function TeacherNavbar({ activePage }: { activePage: "dashboard" 
           </div>
           <div className="flex flex-col">
             <h2 className="text-primary text-lg font-bold leading-tight tracking-tight">
-              NITK Proctoring
+              NITK LabLock
             </h2>
             <p className="text-[10px] uppercase tracking-widest font-semibold opacity-70">
               Dept. of IT

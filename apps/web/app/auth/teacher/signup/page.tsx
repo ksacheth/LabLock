@@ -60,7 +60,7 @@ export default function TeacherSignup() {
                 Register as Educator
               </h1>
               <p className="text-slate-500 dark:text-slate-400 text-sm mt-1">
-                Apply to join NITK Lab Proctor as faculty
+                Apply to join NITK LabLock as faculty
               </p>
             </div>
 
