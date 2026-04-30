@@ -1314,6 +1314,7 @@ export const UserScalarFieldEnum = {
   departmentId: 'departmentId',
   batchId: 'batchId',
   rollNumber: 'rollNumber',
+  facultyApproved: 'facultyApproved',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt'
 } as const

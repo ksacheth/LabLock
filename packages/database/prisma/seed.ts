@@ -23,6 +23,7 @@ async function main() {
       name: "Admin",
       password,
       role: UserRole.ADMIN,
+      facultyApproved: true,
       departmentId: null,
       batchId: null,
       rollNumber: null,
@@ -32,6 +33,7 @@ async function main() {
       name: "Admin",
       password,
       role: UserRole.ADMIN,
+      facultyApproved: true,
     },
   });
 }

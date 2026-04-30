@@ -122,6 +122,9 @@ model User {
   batchId      String?
   batch        Batch?      @relation(fields: [batchId], references: [id])
   rollNumber   String?     @unique
+  /// When role is FACULTY: false until an admin approves the account (self-serve teacher signup).
+  /// For STUDENT/ADMIN this is kept true and is not used for access control.
+  facultyApproved Boolean  @default(true)
   createdAt    DateTime    @default(now())
   updatedAt    DateTime    @updatedAt
 
