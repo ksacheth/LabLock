@@ -3,7 +3,8 @@ import prisma from "@repo/database";
 import { ExamSchema, UpdateExamSchema } from "@common/types";
 import { authMiddleware } from "../middleware/auth.ts";
 import { logApiEvent } from "../lib/logging.ts";
-import { rejectUnapprovedFaculty, FACULTY_PENDING_MSG } from "../lib/faculty.ts";
+import { FACULTY_PENDING_MSG } from "../lib/faculty.ts";
+import { authorizeRequest } from "../authorization/authorize-request.ts";
 import { calculateExamEndTime, isExamCurrentlyActive, deactivateExpiredExams } from "../lib/exam-status.ts";
 
 export function registerExamRoutes(app: Express) {
@@ -31,20 +32,9 @@ app.post(
     } = result.data;
 
     try {
-      // 2. Verify the authenticated user is FACULTY
-      const creator = await prisma.user.findUnique({
-        where: { id: _req.userId! },
-      });
-
-      if (
-        rejectUnapprovedFaculty(
-          res,
-          creator,
-          "Only faculty members can create exams",
-        )
-      ) {
-        return;
-      }
+      // 2. Verify the authenticated user is approved FACULTY
+      const actor = await authorizeRequest(_req, res, "exam:create");
+      if (!actor) return;
 
       const batch = await prisma.batch.findUnique({
         where: { id: batchId },
@@ -261,38 +251,22 @@ app.patch(
   async (_req: Request, res: Response) => {
     const { id } = _req.params;
 
-    const faculty = await prisma.user.findUnique({
-      where: { id: _req.userId! },
-    });
-    if (
-      rejectUnapprovedFaculty(
-        res,
-        faculty,
-        "Only faculty members can update exams",
-      )
-    ) {
-      return;
-    }
-
-    const result = UpdateExamSchema.safeParse(_req.body);
-    if (!result.success) {
-      return res
-        .status(400)
-        .json({ errors: result.error.flatten().fieldErrors });
-    }
-
     try {
       const exam = await prisma.exam.findUnique({
         where: { id },
       });
-      if (!exam || exam.deletedAt !== null) {
-        return res.status(404).json({ error: "Exam not found" });
-      }
 
-      if (exam.creatorId !== faculty!.id) {
+      const actor = await authorizeRequest(_req, res, "exam:update", exam);
+      if (!actor) return;
+      // authorize already returned 404 for a missing/soft-deleted exam; this
+      // narrows the type for the rest of the handler.
+      if (!exam) return;
+
+      const result = UpdateExamSchema.safeParse(_req.body);
+      if (!result.success) {
         return res
-          .status(403)
-          .json({ error: "You are not the creator of this exam" });
+          .status(400)
+          .json({ errors: result.error.flatten().fieldErrors });
       }
 
       const {
@@ -376,33 +350,16 @@ app.delete(
   async (_req: Request, res: Response) => {
     const { id } = _req.params;
 
-    const faculty = await prisma.user.findUnique({
-      where: { id: _req.userId! },
-    });
-    if (
-      rejectUnapprovedFaculty(
-        res,
-        faculty,
-        "Only faculty members can delete exams",
-      )
-    ) {
-      return;
-    }
-
     try {
       const exam = await prisma.exam.findUnique({
         where: { id },
       });
 
-      if (!exam || exam.deletedAt !== null) {
-        return res.status(404).json({ error: "Exam not found" });
-      }
-
-      if (exam.creatorId !== faculty!.id) {
-        return res
-          .status(403)
-          .json({ error: "You are not the creator of this exam" });
-      }
+      const actor = await authorizeRequest(_req, res, "exam:delete", exam);
+      if (!actor) return;
+      // authorize already returned 404 for a missing/soft-deleted exam; this
+      // narrows the type for the rest of the handler.
+      if (!exam) return;
 
       if (isExamCurrentlyActive(exam)) {
         return res
