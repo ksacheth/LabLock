@@ -61,3 +61,40 @@ in `docs/adr/`.
 - **Faculty approval** — self-registered faculty are gated behind administrator
   approval before they can author exams. Unapproved faculty are rejected at
   protected routes.
+
+### Authorization
+
+- **authorize** — the pure decision that answers "may this actor perform this action
+  on this resource?". `authorize(actor, action, resource?) → Decision`. It owns
+  role, faculty-approval and **ownership** (own the gating exam), plus the
+  exam-level `404` (missing/soft-deleted) and `403` (non-owner). It is **pure and
+  blind to I/O** — the handler loads the actor and resource and passes them in — so
+  its whole behaviour is a policy table, the test surface. Lives in
+  `apps/api/src/authorization/authorize.ts`. See
+  [ADR-0003](docs/adr/0003-authorization-decision-seam.md).
+
+- **Actor** — the authenticated principal as `authorize` sees it:
+  `{ id, role, facultyApproved } | null`. A **null** actor (valid JWT, user record
+  gone) is an authentication failure → `401 ACCOUNT_NOT_FOUND`, not a role/ownership
+  denial.
+
+- **Action** — a fine-grained verb (`exam:create`, `question:create`, `user:admin`,
+  …) keyed into one **policy table** giving `{ role, requireApproval, ownership,
+  message }`. Ownership is uniform: nested actions (`question:*`, `testcase:*`) gate
+  on the **parent exam's** ownership. Naming an action is mandatory, so a new route
+  cannot forget a check.
+
+- **Decision** — `authorize`'s typed result: `{ ok: true }` or
+  `{ ok: false, status, error, code? }`. Not a thrown error and not `res`-coupled —
+  it carries the `403`/`404`/`401` distinction so the core stays pure and testable.
+
+- **`authorizeRequest`** — the thin Express/Prisma **adapter** over `authorize`: it
+  loads the actor, calls the pure decision, and on deny sends the response and
+  returns `null` (on allow it returns the actor). The **resource is still loaded by
+  the handler**, so nested-resource existence (e.g. "Question not found") stays a
+  handler precondition, not an authorization rule.
+
+- **Exam-time preconditions** (eligibility, time-window, attempt-status) are **not**
+  authorization — they belong to the future **ExamSession** module. For student
+  routes `authorize` replaces only the `STUDENT` role-gate; the exam-time logic stays
+  inline.
