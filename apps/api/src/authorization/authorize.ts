@@ -6,7 +6,13 @@ import type { UserRole } from "@repo/database";
 
 type Actor = { id: string; role: UserRole; facultyApproved: boolean } | null;
 
-type Action = "exam:create" | "exam:update" | "exam:delete";
+type Action =
+  | "exam:create"
+  | "exam:update"
+  | "exam:delete"
+  | "question:create"
+  | "question:update"
+  | "question:delete";
 
 // The owning exam, as authorize needs to see it. `null` ⇒ not found / soft-deleted.
 type Resource = { creatorId: string; deletedAt: Date | null } | null;
@@ -46,6 +52,24 @@ const POLICY: Record<
     requireApproval: true,
     ownership: "exam",
     message: "Only faculty members can delete exams",
+  },
+  "question:create": {
+    role: "FACULTY",
+    requireApproval: true,
+    ownership: "exam",
+    message: "Only faculty members can add questions",
+  },
+  "question:update": {
+    role: "FACULTY",
+    requireApproval: true,
+    ownership: "exam",
+    message: "Only faculty members can update questions",
+  },
+  "question:delete": {
+    role: "FACULTY",
+    requireApproval: true,
+    ownership: "exam",
+    message: "Only faculty members can delete questions",
   },
 };
 
