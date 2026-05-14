@@ -3,59 +3,42 @@ import prisma from "@repo/database";
 import { QuestionSchema, UpdateQuestionSchema } from "@common/types";
 import { authMiddleware } from "../middleware/auth.ts";
 import { rejectUnapprovedFaculty } from "../lib/faculty.ts";
+import { authorizeRequest } from "../authorization/authorize-request.ts";
 
 export function registerQuestionRoutes(app: Express) {
 app.post(
   "/api/exams/:id/questions",
   authMiddleware,
   async (_req: Request, res: Response) => {
-    const faculty = await prisma.user.findUnique({
-      where: { id: _req.userId! },
-    });
-    if (
-      rejectUnapprovedFaculty(
-        res,
-        faculty,
-        "Only faculty members can add questions",
-      )
-    ) {
-      return;
-    }
-
-    // 2. Validate body
-    const result = QuestionSchema.safeParse(_req.body);
-    if (!result.success) {
-      return res
-        .status(400)
-        .json({ errors: result.error.flatten().fieldErrors });
-    }
-
-    const {
-      title,
-      description,
-      marks,
-      timeLimitMs,
-      memoryLimitKb,
-      orderIndex,
-    } = result.data;
-
     try {
-      // 3. Exam must exist, not be soft-deleted, and belong to this faculty
+      // Authorization (role / approval / parent-exam ownership) lives behind the
+      // seam; the handler loads the owning exam and passes it in.
       const exam = await prisma.exam.findUnique({
         where: { id: _req.params.id },
       });
 
-      if (!exam || exam.deletedAt !== null) {
-        return res.status(404).json({ error: "Exam not found" });
-      }
+      const actor = await authorizeRequest(_req, res, "question:create", exam);
+      if (!actor) return;
+      if (!exam) return; // narrows the type; authorize already 404'd a missing exam
 
-      if (exam.creatorId !== faculty!.id) {
+      // Validate body
+      const result = QuestionSchema.safeParse(_req.body);
+      if (!result.success) {
         return res
-          .status(403)
-          .json({ error: "You are not the creator of this exam" });
+          .status(400)
+          .json({ errors: result.error.flatten().fieldErrors });
       }
 
-      // 4. Cannot add questions to an already-active (live) exam
+      const {
+        title,
+        description,
+        marks,
+        timeLimitMs,
+        memoryLimitKb,
+        orderIndex,
+      } = result.data;
+
+      // Cannot add questions to an already-active (live) exam
       if (exam.isActive) {
         return res
           .status(400)
@@ -143,27 +126,9 @@ app.patch(
   "/api/questions/:id",
   authMiddleware,
   async (_req: Request, res: Response) => {
-    const faculty = await prisma.user.findUnique({
-      where: { id: _req.userId! },
-    });
-    if (
-      rejectUnapprovedFaculty(
-        res,
-        faculty,
-        "Only faculty members can update questions",
-      )
-    ) {
-      return;
-    }
-
-    const result = UpdateQuestionSchema.safeParse(_req.body);
-    if (!result.success) {
-      return res
-        .status(400)
-        .json({ errors: result.error.flatten().fieldErrors });
-    }
-
     try {
+      // Leaf existence ("Question not found") is a handler precondition, checked
+      // before authorize. Ownership is then enforced via the parent exam.
       const question = await prisma.question.findUnique({
         where: { id: _req.params.id },
         include: { exam: true },
@@ -173,10 +138,19 @@ app.patch(
         return res.status(404).json({ error: "Question not found" });
       }
 
-      if (question.exam.creatorId !== faculty!.id) {
+      const actor = await authorizeRequest(
+        _req,
+        res,
+        "question:update",
+        question.exam,
+      );
+      if (!actor) return;
+
+      const result = UpdateQuestionSchema.safeParse(_req.body);
+      if (!result.success) {
         return res
-          .status(403)
-          .json({ error: "You are not the creator of this exam" });
+          .status(400)
+          .json({ errors: result.error.flatten().fieldErrors });
       }
 
       if (question.exam.isActive) {
@@ -219,20 +193,9 @@ app.delete(
   "/api/questions/:id",
   authMiddleware,
   async (_req: Request, res: Response) => {
-    const faculty = await prisma.user.findUnique({
-      where: { id: _req.userId! },
-    });
-    if (
-      rejectUnapprovedFaculty(
-        res,
-        faculty,
-        "Only faculty members can delete questions",
-      )
-    ) {
-      return;
-    }
-
     try {
+      // Leaf existence ("Question not found") is a handler precondition, checked
+      // before authorize. Ownership is then enforced via the parent exam.
       const question = await prisma.question.findUnique({
         where: { id: _req.params.id },
         include: { exam: true },
@@ -242,11 +205,13 @@ app.delete(
         return res.status(404).json({ error: "Question not found" });
       }
 
-      if (question.exam.creatorId !== faculty!.id) {
-        return res
-          .status(403)
-          .json({ error: "You are not the creator of this exam" });
-      }
+      const actor = await authorizeRequest(
+        _req,
+        res,
+        "question:delete",
+        question.exam,
+      );
+      if (!actor) return;
 
       if (question.exam.isActive) {
         return res
