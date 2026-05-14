@@ -166,6 +166,21 @@ test("a non-faculty actor cannot delete a question", () => {
   });
 });
 
+test("approved faculty may read questions of an exam they own", () => {
+  expect(authorize(approvedFaculty, "question:read", ownedExam)).toEqual({
+    ok: true,
+  });
+});
+
+test("a non-faculty actor cannot read an exam's questions", () => {
+  const student = { id: "s1", role: "STUDENT" as const, facultyApproved: false };
+  expect(authorize(student, "question:read", ownedExam)).toEqual({
+    ok: false,
+    status: 403,
+    error: "Only faculty members can view questions",
+  });
+});
+
 test("a question on an exam owned by someone else is forbidden", () => {
   const someoneElsesExam = { creatorId: "other", deletedAt: null };
   expect(authorize(approvedFaculty, "question:update", someoneElsesExam)).toEqual({

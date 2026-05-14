@@ -15,6 +15,7 @@ type Action =
   | "question:create"
   | "question:update"
   | "question:delete"
+  | "question:read"
   | "testcase:create"
   | "testcase:update"
   | "testcase:delete"
@@ -92,6 +93,12 @@ const POLICY: Record<
     requireApproval: true,
     ownership: "exam",
     message: "Only faculty members can delete questions",
+  },
+  "question:read": {
+    role: "FACULTY",
+    requireApproval: true,
+    ownership: "exam",
+    message: "Only faculty members can view questions",
   },
   "testcase:create": {
     role: "FACULTY",
@@ -187,5 +194,5 @@ function authorize(actor: Actor, action: Action, resource?: Resource): Decision 
   return { ok: true };
 }
 
-export { authorize };
+export { authorize, FACULTY_PENDING_MSG, FACULTY_PENDING_APPROVAL };
 export type { Actor, Action, Resource, Decision };
