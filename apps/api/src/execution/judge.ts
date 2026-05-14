@@ -215,6 +215,9 @@ function getHigherPriorityExecutionStatus(
     TIME_LIMIT_EXCEEDED: 2,
     RUNTIME_ERROR: 3,
     COMPILE_ERROR: 4,
+    // SYSTEM_ERROR is a whole-question verdict set directly, never aggregated.
+    // Present only for type-exhaustiveness.
+    SYSTEM_ERROR: 5,
   };
 
   return priority[next] > priority[current] ? next : current;
@@ -344,13 +347,20 @@ async function judge(
     success: runnerResult.compile.ok && runnerResult.error === null,
   });
 
-  // Slice 1: a runner-level (infrastructure) failure preserves today's
-  // behavior — it throws and surfaces as a 500. Turning it into a
-  // SYSTEM_ERROR outcome is a separate slice (see ADR-0002).
+  // A runner-level (infrastructure) failure is not the student's fault: it is a
+  // whole-question SYSTEM_ERROR verdict, set directly here and never aggregated.
+  // Callers quarantine it (submit) or return 503 (run). See ADR-0002.
   if (runnerResult.error) {
-    throw new Error(
-      `Runner failure (${runnerResult.error.kind}): ${runnerResult.error.message}`,
-    );
+    return {
+      status: "SYSTEM_ERROR",
+      executionTimeMs: null,
+      memoryUsedKb: null,
+      passedCount: 0,
+      totalCount: cases.length,
+      stdErr: `${runnerResult.error.kind}: ${runnerResult.error.message}`,
+      testCaseResults: [] satisfies StudentRunTestCaseResult[],
+      storedTestCaseResults: [] satisfies StoredTestCaseResult[],
+    } satisfies StudentRunExecutionResult;
   }
 
   if (!runnerResult.compile.ok) {

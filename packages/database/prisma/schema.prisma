@@ -32,6 +32,9 @@ enum SubmissionStatus {
   RUNTIME_ERROR
   TIME_LIMIT_EXCEEDED
   MEMORY_LIMIT_EXCEEDED
+  // Runner-level (infrastructure) failure — quarantined for re-run, not a
+  // graded student outcome. See docs/adr/0002-system-error-status.md.
+  SYSTEM_ERROR
 }
 
 enum ViolationType {
