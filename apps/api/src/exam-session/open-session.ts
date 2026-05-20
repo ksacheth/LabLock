@@ -7,7 +7,7 @@ import type { Request, Response } from "express";
 import prisma from "@repo/database";
 import { logApiEvent } from "../lib/logging.ts";
 import { deactivateExpiredExams } from "../lib/exam-status.ts";
-import { evaluateSession, type SessionIntent, type Session } from "./exam-session.ts";
+import { evaluateSession, POLICY, type SessionIntent, type Session } from "./exam-session.ts";
 
 async function openSession(
   req: Request,
@@ -15,25 +15,29 @@ async function openSession(
   examId: string,
   intent: SessionIntent,
 ): Promise<Session | null> {
+  const policy = POLICY[intent];
   const now = new Date();
-  await deactivateExpiredExams(now);
+  if (policy.expire) await deactivateExpiredExams(now);
 
-  // Independent of each other (all post-expire) — load in parallel.
+  // The attempt is needed by every intent; exam/student only when the policy
+  // says so (violation loads neither). Independent of each other — load in parallel.
   const [exam, attempt, student] = await Promise.all([
-    prisma.exam.findUnique({
-      where: { id: examId },
-      select: {
-        id: true,
-        title: true,
-        description: true,
-        startTime: true,
-        endTime: true,
-        durationMin: true,
-        isActive: true,
-        deletedAt: true,
-        eligibilities: { select: { batchId: true, departmentId: true } },
-      },
-    }),
+    policy.loadExam
+      ? prisma.exam.findUnique({
+          where: { id: examId },
+          select: {
+            id: true,
+            title: true,
+            description: true,
+            startTime: true,
+            endTime: true,
+            durationMin: true,
+            isActive: true,
+            deletedAt: true,
+            eligibilities: { select: { batchId: true, departmentId: true } },
+          },
+        })
+      : Promise.resolve(null),
     prisma.examAttempt.findFirst({
       where: { userId: req.userId!, examId },
       orderBy: { retakeNumber: "desc" },
@@ -47,10 +51,12 @@ async function openSession(
         ipAddress: true,
       },
     }),
-    prisma.user.findUnique({
-      where: { id: req.userId! },
-      select: { batchId: true, departmentId: true },
-    }),
+    policy.loadStudent
+      ? prisma.user.findUnique({
+          where: { id: req.userId! },
+          select: { batchId: true, departmentId: true },
+        })
+      : Promise.resolve(null),
   ]);
 
   const result = evaluateSession(intent, {
