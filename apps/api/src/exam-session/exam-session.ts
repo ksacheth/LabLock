@@ -50,59 +50,128 @@ type Session = {
   attempt: AttemptSnapshot | null;
 };
 
-function evaluateSession(intent: SessionIntent, snapshot: Snapshot): Session | Refusal {
-  const { exam, attempt, now } = snapshot;
+// The exam-time policy, one row per intent. Drives both the pure decision below
+// (eligibility / window / attempt rules) and the adapter's loading (expire,
+// loadExam, loadStudent). The three preserved divergences live here as data:
+// submit has window "none", violation skips exam entirely, eligibility is enter-only.
+type Policy = {
+  expire: boolean;
+  loadExam: boolean;
+  loadStudent: boolean;
+  checkEligibility: boolean;
+  window: "none" | "granular" | "coarse";
+  windowMessage?: string;
+  attempt: "enter" | "require" | "submit" | "violation";
+  notInProgressMessage?: string;
+};
 
-  if (!exam || exam.deletedAt !== null) {
+const POLICY: Record<SessionIntent, Policy> = {
+  enter: {
+    expire: true, loadExam: true, loadStudent: true, checkEligibility: true,
+    window: "granular", attempt: "enter",
+  },
+  draft: {
+    expire: true, loadExam: true, loadStudent: false, checkEligibility: false,
+    window: "coarse", windowMessage: "This exam room is not accepting code drafts now",
+    attempt: "require", notInProgressMessage: "Enter the exam room before saving code drafts",
+  },
+  run: {
+    expire: true, loadExam: true, loadStudent: false, checkEligibility: false,
+    window: "coarse", windowMessage: "This exam room is not accepting code runs now",
+    attempt: "require", notInProgressMessage: "Enter the exam room before running code",
+  },
+  submit: {
+    expire: true, loadExam: true, loadStudent: false, checkEligibility: false,
+    window: "none", attempt: "submit",
+  },
+  violation: {
+    expire: false, loadExam: false, loadStudent: false, checkEligibility: false,
+    window: "none", attempt: "violation",
+  },
+};
+
+function checkAttempt(policy: Policy, attempt: AttemptSnapshot | null): Refusal | null {
+  switch (policy.attempt) {
+    case "enter":
+      if (attempt?.status === "COMPLETED") {
+        return { ok: false, status: 400, error: "You have already submitted this exam", code: "ALREADY_SUBMITTED" };
+      }
+      if (attempt?.status === "DISQUALIFIED") {
+        return { ok: false, status: 403, error: "Your exam attempt has been disqualified", code: "DISQUALIFIED" };
+      }
+      return null;
+    case "require":
+      if (!attempt || attempt.status !== "IN_PROGRESS") {
+        return { ok: false, status: 400, error: policy.notInProgressMessage!, code: "NOT_IN_PROGRESS" };
+      }
+      return null;
+    case "submit":
+      if (!attempt) {
+        return { ok: false, status: 400, error: "No attempt found for this exam", code: "NO_ATTEMPT" };
+      }
+      if (attempt.status === "DISQUALIFIED") {
+        return { ok: false, status: 403, error: "This attempt has been disqualified", code: "DISQUALIFIED" };
+      }
+      if (attempt.status === "COMPLETED") {
+        return {
+          ok: false, status: 400, error: "This exam has already been submitted",
+          code: "ALREADY_SUBMITTED", details: { score: attempt.score },
+        };
+      }
+      if (attempt.status !== "IN_PROGRESS") {
+        return { ok: false, status: 400, error: "Exam must be in progress to submit", code: "NOT_IN_PROGRESS" };
+      }
+      return null;
+    case "violation":
+      if (!attempt || attempt.status !== "IN_PROGRESS") {
+        return { ok: false, status: 404, error: "No active IN_PROGRESS attempt found", code: "NO_ACTIVE_ATTEMPT" };
+      }
+      return null;
+  }
+}
+
+function evaluateSession(intent: SessionIntent, snapshot: Snapshot): Session | Refusal {
+  const policy = POLICY[intent];
+  const { exam, attempt, student, now } = snapshot;
+
+  if (policy.loadExam && (!exam || exam.deletedAt !== null)) {
     return { ok: false, status: 404, error: "Exam not found", code: "EXAM_NOT_FOUND" };
   }
 
-  const { student } = snapshot;
-  const isEligible =
-    exam.eligibilities.length === 0 ||
-    exam.eligibilities.some(
-      (e) =>
-        (e.batchId !== null && e.batchId === student.batchId) ||
-        (e.departmentId !== null && e.departmentId === student.departmentId),
-    );
-  if (!isEligible) {
-    return {
-      ok: false,
-      status: 403,
-      error: "You are not eligible to enter this exam room",
-      code: "INELIGIBLE",
-    };
+  if (policy.checkEligibility && exam) {
+    const isEligible =
+      exam.eligibilities.length === 0 ||
+      exam.eligibilities.some(
+        (e) =>
+          (e.batchId !== null && e.batchId === student.batchId) ||
+          (e.departmentId !== null && e.departmentId === student.departmentId),
+      );
+    if (!isEligible) {
+      return { ok: false, status: 403, error: "You are not eligible to enter this exam room", code: "INELIGIBLE" };
+    }
   }
 
-  if (!exam.isActive) {
-    return { ok: false, status: 400, error: "This exam is not live right now", code: "NOT_ACTIVE" };
-  }
-  if (exam.startTime > now) {
-    return { ok: false, status: 400, error: "This exam has not started yet", code: "NOT_STARTED" };
-  }
-  if (exam.endTime <= now) {
-    return { ok: false, status: 400, error: "This exam has already ended", code: "ENDED" };
+  if (exam && policy.window === "granular") {
+    if (!exam.isActive) {
+      return { ok: false, status: 400, error: "This exam is not live right now", code: "NOT_ACTIVE" };
+    }
+    if (exam.startTime > now) {
+      return { ok: false, status: 400, error: "This exam has not started yet", code: "NOT_STARTED" };
+    }
+    if (exam.endTime <= now) {
+      return { ok: false, status: 400, error: "This exam has already ended", code: "ENDED" };
+    }
+  } else if (exam && policy.window === "coarse") {
+    if (!exam.isActive || exam.startTime > now || exam.endTime <= now) {
+      return { ok: false, status: 400, error: policy.windowMessage!, code: "WINDOW_CLOSED" };
+    }
   }
 
-  if (attempt?.status === "COMPLETED") {
-    return {
-      ok: false,
-      status: 400,
-      error: "You have already submitted this exam",
-      code: "ALREADY_SUBMITTED",
-    };
-  }
-  if (attempt?.status === "DISQUALIFIED") {
-    return {
-      ok: false,
-      status: 403,
-      error: "Your exam attempt has been disqualified",
-      code: "DISQUALIFIED",
-    };
-  }
+  const refusal = checkAttempt(policy, attempt);
+  if (refusal) return refusal;
 
   return { ok: true, now, exam, attempt };
 }
 
-export { evaluateSession };
+export { evaluateSession, POLICY };
 export type { SessionIntent, ExamSnapshot, AttemptSnapshot, Snapshot, Session, Refusal };
