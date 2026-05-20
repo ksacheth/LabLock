@@ -9,6 +9,7 @@ import { deactivateExpiredExams } from "../lib/exam-status.ts";
 import { judge } from "../execution/judge.ts";
 import { upsertStudentSubmissionRecord } from "../lib/submissions.ts";
 import { authorizeRequest } from "../authorization/authorize-request.ts";
+import { openSession } from "../exam-session/open-session.ts";
 
 export function registerStudentRoutes(app: Express) {
 app.post(
@@ -16,146 +17,31 @@ app.post(
   authMiddleware,
   async (_req: Request, res: Response) => {
     try {
-      const now = new Date();
-      await deactivateExpiredExams(now);
-
       const actor = await authorizeRequest(_req, res, "student:enter");
       if (!actor) return;
 
-      // The eligibility check below needs the student's batch/department, so the
-      // handler still loads the full record (authorize already confirmed it exists).
-      const student = await prisma.user.findUnique({
-        where: { id: _req.userId! },
-      });
-      if (!student) return;
-
-      const exam = await prisma.exam.findUnique({
-        where: { id: _req.params.id },
-        select: {
-          id: true,
-          title: true,
-          description: true,
-          startTime: true,
-          endTime: true,
-          durationMin: true,
-          isActive: true,
-          deletedAt: true,
-          eligibilities: {
-            select: {
-              batchId: true,
-              departmentId: true,
-            },
-          },
-        },
-      });
-
-      if (!exam || exam.deletedAt !== null) {
-        logApiEvent("exam.enter.denied", {
-          userId: student.id,
-          examId: _req.params.id ?? null,
-          reason: "exam_not_found",
-        });
-        return res.status(404).json({ error: "Exam not found" });
-      }
-
-      const isEligible =
-        exam.eligibilities.length === 0 ||
-        exam.eligibilities.some(
-          (eligibility) =>
-            (eligibility.batchId !== null &&
-              eligibility.batchId === student.batchId) ||
-            (eligibility.departmentId !== null &&
-              eligibility.departmentId === student.departmentId),
-        );
-
-      if (!isEligible) {
-        logApiEvent("exam.enter.denied", {
-          userId: student.id,
-          examId: exam.id,
-          reason: "ineligible",
-        });
-        return res
-          .status(403)
-          .json({ error: "You are not eligible to enter this exam room" });
-      }
-
-      if (!exam.isActive) {
-        logApiEvent("exam.enter.denied", {
-          userId: student.id,
-          examId: exam.id,
-          reason: "not_active",
-        });
-        return res
-          .status(400)
-          .json({ error: "This exam is not live right now" });
-      }
-
-      if (exam.startTime > now) {
-        logApiEvent("exam.enter.denied", {
-          userId: student.id,
-          examId: exam.id,
-          reason: "not_started",
-        });
-        return res.status(400).json({ error: "This exam has not started yet" });
-      }
-
-      if (exam.endTime <= now) {
-        logApiEvent("exam.enter.denied", {
-          userId: student.id,
-          examId: exam.id,
-          reason: "ended",
-        });
-        return res.status(400).json({ error: "This exam has already ended" });
-      }
-
-      const latestAttempt = await prisma.examAttempt.findFirst({
-        where: {
-          userId: student.id,
-          examId: exam.id,
-        },
-        orderBy: { retakeNumber: "desc" },
-      });
-
-      if (latestAttempt?.status === "COMPLETED") {
-        logApiEvent("exam.enter.denied", {
-          userId: student.id,
-          examId: exam.id,
-          reason: "already_submitted",
-          attemptId: latestAttempt.id,
-        });
-        return res
-          .status(400)
-          .json({ error: "You have already submitted this exam" });
-      }
-
-      if (latestAttempt?.status === "DISQUALIFIED") {
-        logApiEvent("exam.enter.denied", {
-          userId: student.id,
-          examId: exam.id,
-          reason: "disqualified",
-          attemptId: latestAttempt.id,
-        });
-        return res
-          .status(403)
-          .json({ error: "Your exam attempt has been disqualified" });
-      }
+      const session = await openSession(_req, res, _req.params.id!, "enter");
+      if (!session) return;
+      const { exam, attempt: priorAttempt, now } = session;
+      // openSession already returned 404 for a missing/soft-deleted exam.
+      if (!exam) return;
 
       const ipAddress = typeof _req.ip === "string" ? _req.ip : undefined;
 
-      const attempt = latestAttempt
-        ? latestAttempt.status === "IN_PROGRESS"
-          ? latestAttempt
+      const attempt = priorAttempt
+        ? priorAttempt.status === "IN_PROGRESS"
+          ? priorAttempt
           : await prisma.examAttempt.update({
-              where: { id: latestAttempt.id },
+              where: { id: priorAttempt.id },
               data: {
                 status: "IN_PROGRESS",
-                startedAt: latestAttempt.startedAt ?? now,
-                ipAddress: latestAttempt.ipAddress ?? ipAddress,
+                startedAt: priorAttempt.startedAt ?? now,
+                ipAddress: priorAttempt.ipAddress ?? ipAddress,
               },
             })
         : await prisma.examAttempt.create({
             data: {
-              userId: student.id,
+              userId: actor.id,
               examId: exam.id,
               status: "IN_PROGRESS",
               startedAt: now,
@@ -180,7 +66,7 @@ app.post(
           submissions: {
             where: {
               attemptId: attempt.id,
-              userId: student.id,
+              userId: actor.id,
             },
             orderBy: { submittedAt: "desc" },
             take: 1,
@@ -195,7 +81,7 @@ app.post(
       });
 
       logApiEvent("exam.enter.success", {
-        userId: student.id,
+        userId: actor.id,
         examId: exam.id,
         attemptId: attempt.id,
         questionCount: questions.length,

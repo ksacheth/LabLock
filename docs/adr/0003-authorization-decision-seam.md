@@ -122,4 +122,6 @@ existence of the thing being acted on, not authorization.
 
 - [ADR-0001](0001-execution-runner-seam.md) — the pure-core + adapter split this ADR
   mirrors.
+- [ADR-0004](0004-exam-session-seam.md) — the Exam-session seam that now owns the
+  student exam-time preconditions this ADR deferred.
 - Glossary: **authorize**, **Actor**, **Action**, **Decision** in `CONTEXT.md`.

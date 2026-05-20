@@ -119,8 +119,8 @@ const POLICY: Record<
     message: "Only faculty members can delete test cases",
   },
   // Student role-gates (issue #13): pure role checks. Exam-time preconditions
-  // (eligibility, time-window, attempt-status) stay inline in the handlers and
-  // are owned by the future ExamSession module.
+  // (eligibility, time-window, attempt-status) are owned by the ExamSession seam
+  // (openSession) — see ADR-0004 — not by this role-gate.
   "student:enter": {
     role: "STUDENT",
     requireApproval: false,
