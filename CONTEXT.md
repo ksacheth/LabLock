@@ -37,10 +37,38 @@ in `docs/adr/`.
   - **host adapter** (`host-runner.ts`) — runs the toolchain (`gcc`/`g++`/`javac`/
     `python3`) as child processes of the API host. **Current default. Not
     sandboxed** — untrusted code runs on the host with only a wall-clock timeout.
-  - **sandbox adapter** — *not built.* A future isolating adapter (container /
-    resource-limited) drops in behind the same seam with no Judge changes.
+  - **sandbox adapter** — the isolating adapter: **one Docker container per `run()`**
+    (compile + all cases inside it), network-off, read-only rootfs, non-root, with a
+    **platform resource ceiling** (see below). Drops in behind the same seam with **no
+    Judge changes**. **Host stays the default**; sandbox is selected by env and used in
+    prod — and **never silently falls back to host** (fail loud at boot, `SYSTEM_ERROR`
+    at runtime). See [ADR-0006](docs/adr/0006-sandbox-runner-adapter.md).
   - **fake** — an in-memory Runner returning canned `RunnerResult`s, used to test
     the Judge without spawning a toolchain.
+
+- **Sandbox harness** — the small, *trusted*, language-agnostic executor baked into the
+  sandbox image. The adapter (host-side, reusing the Judge's execution-plan knowledge)
+  hands it a JSON job — source, compile/run commands, per-case timeouts, cases — and it
+  compiles, runs each case with an in-namespace per-case timeout, and emits one
+  `RunnerResult`-shaped JSON. **A valid harness JSON is the boundary between a student
+  outcome and an infrastructure failure**: if the harness spoke, trust its
+  `compile`/`cases`; anything that stops it (daemon down, image missing, crash, malformed
+  output, outer deadman timeout) is infra → `RunnerResult.error` → `SYSTEM_ERROR`
+  (ADR-0002).
+
+- **Platform resource ceiling** — a fixed, generous per-execution cap (memory, CPU, PID
+  count, wall-clock deadman) whose only job is *infrastructure safety*: untrusted code
+  must not crash or exhaust the API host. A breach surfaces as an ordinary student
+  outcome (e.g. OOM-kill → `RUNTIME_ERROR`), **not** as `SYSTEM_ERROR`. Distinct from a
+  **per-question grading limit** below.
+
+- **Per-question grading limit** (`memoryLimitKb`) — the faculty-authored, assessment-level
+  memory bound stored per question. Currently **authored but unenforced** (never passed to
+  the Runner; `memoryUsedKb` is always `null`; there is no `MEMORY_LIMIT_EXCEEDED` status).
+  Enforcing it — threading the limit into the Runner, measuring peak usage, and adding a
+  `MEMORY_LIMIT_EXCEEDED` verdict — is a **grading-semantics change to the Judge**, kept
+  **out of scope** of the sandbox adapter (which only enforces the platform ceiling) and
+  deferred to its own decision.
 
 - **Verdict / execution status** — a submission's outcome. Values:
   `ACCEPTED`, `WRONG_ANSWER`, `TIME_LIMIT_EXCEEDED`, `RUNTIME_ERROR`,
@@ -130,3 +158,51 @@ in `docs/adr/`.
   `score` when `submit` refuses an already-`COMPLETED` attempt. `openSession`
   consumes this: it writes the HTTP response on a `Refusal` and returns
   `Session | null` to the handler.
+
+### Rate limiting
+
+- **RateLimit** — the throttle that answers "has this client made too many requests
+  to this surface in the current window?", protecting resources from volume abuse.
+  Distinct from the **proctoring dedup** below. Scoped to two surfaces: **login**
+  (brute-force) and **run/submit** (protecting the un-sandboxed Judge). Split the
+  same way as the other seams (ADR-0001/0003/0004): a **pure decision core** plus a
+  stateful **adapter**. Lives in `apps/api/src/rate-limit/`.
+
+- **consume** — the **pure** core: `consume(state, now, policy) → { state, decision }`.
+  Given the current bucket/window **state**, the injected **now**, and the **policy**,
+  it returns the next state and an `Allowed | Limited` decision. Blind to I/O and to
+  the clock — state is threaded *through* it rather than hidden inside, so the whole
+  behaviour is a table, the test surface. Switches on the policy's **algorithm**
+  (token-bucket for run/submit, fixed-window for login).
+
+- **Policy** — one row per protected surface (`login`, `run`, `submit`) in a single
+  table: `{ algorithm, limits, key }`, where **key** is the per-policy identity
+  extractor — `user:${id}` for run/submit, `login:${ip}:${email}` for login. Naming a
+  policy is how a call site opts a route in.
+
+- **Allowed / Limited** — `consume`'s typed result, discriminated on `ok` (like
+  `Decision` and `Session`). `Allowed = { ok: true, remaining, resetAt }`;
+  `Limited = { ok: false, status: 429, error, code: "RATE_LIMITED", retryAfter,
+  resetAt }`.
+
+- **RateLimitStore** — the seam (interface) the adapter reads/writes bucket state
+  through: **in-memory Map** (current default, single-process) and a documented,
+  unbuilt **Redis** adapter for multi-server (parallel to Runner's `host` /
+  unbuilt `sandbox`). Single-process in-memory is race-free without atomic scripts
+  **because the adapter's read-modify-write runs synchronously with no `await`
+  between read and write**; the atomicity Redis needs a Lua script for is provided
+  free by the single-threaded runtime. See ADR-0005.
+
+- **rateLimitRequest** — the Express adapter over `consume`: extracts the policy key,
+  does the synchronous read-modify-write against the store, and on `Limited` writes
+  `429` + `Retry-After` / `RateLimit-*` headers, logs one uniform
+  `rate_limit.exceeded` event, and returns `null` (on `Allowed` returns the actor),
+  in the same idiom as `authorizeRequest` / `openSession`. For **login** it is
+  consulted **on failed credentials only**, so it sits after the password check, not
+  upfront.
+
+- **Proctoring dedup** — the pre-existing per-`(attempt, violationType)` idempotency
+  guard in the violations handler (reject a duplicate of the *same* violation type
+  within 2s). It is **not** rate limiting: it is content-aware, keyed on the event
+  type, and durable in Postgres because it protects proctoring-log *integrity*, not
+  request volume. It stays separate from **RateLimit**.
