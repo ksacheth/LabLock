@@ -3,7 +3,7 @@
 // and logging; it is blind to the execution environment, talking only to a
 // Runner. See docs/adr/0001-execution-runner-seam.md and CONTEXT.md.
 import { logApiEvent } from "../lib/logging.ts";
-import { hostRunner } from "./host-runner.ts";
+import { defaultRunner } from "./runner-selection.ts";
 import type { Runner, RunnerCaseResult } from "./runner.ts";
 import type {
   StudentProgrammingLanguage,
@@ -308,7 +308,10 @@ async function judge(
   submission: JudgeSubmission,
   cases: StudentVisibleTestCase[],
   limits: JudgeLimits,
-  runner: Runner = hostRunner,
+  // Env-driven default (host | sandbox), resolved once in runner-selection.ts.
+  // No logic here changes — this is ADR-0001's "zero judge.ts edits" promise:
+  // the sandbox lands entirely behind this seam. See ADR-0006.
+  runner: Runner = defaultRunner,
 ): Promise<StudentRunExecutionResult> {
   const metadata = submission.metadata;
   const logContext = {
