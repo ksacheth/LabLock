@@ -4,6 +4,7 @@ import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { UserSchema, FacultySignupSchema } from "@common/types";
 import { authMiddleware } from "../middleware/auth.ts";
+import { rateLimitRequest } from "../rate-limit/rate-limit-request.ts";
 import { portalLabelByRole, isPortalRole } from "../types.ts";
 import type { PortalRole } from "../types.ts";
 import { logApiEvent } from "../lib/logging.ts";
@@ -151,6 +152,8 @@ app.post("/api/signin", async (_req: Request, res: Response) => {
   try {
     const user = await prisma.user.findUnique({ where: { email } });
     if (!user) {
+      // Brute-force defense: only failed attempts consume the login window.
+      if (!rateLimitRequest(_req, res, "login")) return;
       logApiEvent("auth.signin.denied", {
         reason: "user_not_found",
         email,
@@ -160,6 +163,7 @@ app.post("/api/signin", async (_req: Request, res: Response) => {
 
     const isPasswordValid = await bcrypt.compare(password, user.password);
     if (!isPasswordValid) {
+      if (!rateLimitRequest(_req, res, "login")) return;
       logApiEvent("auth.signin.denied", {
         reason: "invalid_password",
         userId: user.id,
