@@ -9,6 +9,7 @@ import { judge } from "../execution/judge.ts";
 import { upsertStudentSubmissionRecord } from "../lib/submissions.ts";
 import { authorizeRequest } from "../authorization/authorize-request.ts";
 import { openSession } from "../exam-session/open-session.ts";
+import { rateLimitRequest } from "../rate-limit/rate-limit-request.ts";
 
 export function registerStudentRoutes(app: Express) {
 app.post(
@@ -330,6 +331,8 @@ app.post(
 
       const student = await authorizeRequest(_req, res, "student:run");
       if (!student) return;
+
+      if (!rateLimitRequest(_req, res, "run")) return;
 
       const session = await openSession(_req, res, examId, "run");
       if (!session) return;
