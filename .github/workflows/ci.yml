@@ -6,7 +6,9 @@ on:
   pull_request:
 
 jobs:
-  # Lint + typecheck + the fast (Docker-free) unit tests.
+  # Lint + typecheck + the fast (Docker-free) unit tests for the API. Scoped to
+  # apps/api: this is the workspace the sandbox seam lives in, and the root
+  # `turbo run lint` also gates the frontend on unrelated pre-existing warnings.
   build:
     runs-on: ubuntu-latest
     steps:
@@ -16,7 +18,9 @@ jobs:
           bun-version: 1.3.9
       - run: bun install --frozen-lockfile
       - run: bun run lint
+        working-directory: apps/api
       - run: bun run check-types
+        working-directory: apps/api
       - name: Unit tests
         run: bun test
         working-directory: apps/api
