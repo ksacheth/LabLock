@@ -1,5 +1,5 @@
 import { test, expect } from "bun:test";
-import { consume, type Policy } from "../rate-limit.ts";
+import { consume, initialState, type Policy } from "../rate-limit.ts";
 
 // run policy from ADR-0005 / #35: token bucket, capacity 10, refill 10/min.
 const runPolicy: Policy = {
@@ -7,6 +7,45 @@ const runPolicy: Policy = {
   capacity: 10,
   refillPerMin: 10,
 };
+
+// login policy from ADR-0005 / #37: fixed window, 5 attempts / 15 min.
+const loginPolicy: Policy = {
+  algorithm: "fixed-window",
+  limit: 5,
+  windowMs: 15 * 60 * 1000,
+};
+
+test("fixed window allows up to the limit, then denies with reset-based retry", () => {
+  const now = new Date("2026-07-04T00:00:00.000Z");
+  let state = initialState(loginPolicy, now);
+
+  for (let i = 1; i <= 5; i++) {
+    const r = consume(state, now, loginPolicy);
+    state = r.state;
+    expect(r.decision.ok).toBe(true);
+  }
+
+  const denied = consume(state, now, loginPolicy);
+  expect(denied.decision.ok).toBe(false);
+  if (!denied.decision.ok) {
+    expect(denied.decision.status).toBe(429);
+    // full window remains since all attempts landed at windowStart.
+    expect(denied.decision.retryAfter).toBe(15 * 60);
+    expect(denied.decision.resetAt).toEqual(
+      new Date("2026-07-04T00:15:00.000Z"),
+    );
+  }
+});
+
+test("fixed window resets once the window elapses", () => {
+  const t0 = new Date("2026-07-04T00:00:00.000Z");
+  let state = initialState(loginPolicy, t0);
+  for (let i = 0; i < 5; i++) state = consume(state, t0, loginPolicy).state;
+  // exhausted at t0; 15 minutes later the window rolls over.
+  const later = new Date("2026-07-04T00:15:00.000Z");
+  const r = consume(state, later, loginPolicy);
+  expect(r.decision.ok).toBe(true);
+});
 
 test("a full bucket allows the request and decrements remaining", () => {
   const now = new Date("2026-07-04T00:00:00.000Z");
@@ -16,7 +55,7 @@ test("a full bucket allows the request and decrements remaining", () => {
 
   expect(decision.ok).toBe(true);
   if (decision.ok) expect(decision.remaining).toBe(9);
-  expect(next.tokens).toBe(9);
+  expect((next as { tokens: number }).tokens).toBe(9);
 });
 
 test("tokens accrue with elapsed time at the refill rate", () => {
@@ -29,7 +68,7 @@ test("tokens accrue with elapsed time at the refill rate", () => {
 
   expect(decision.ok).toBe(true);
   if (decision.ok) expect(decision.remaining).toBe(4);
-  expect(next.tokens).toBe(4);
+  expect((next as { tokens: number }).tokens).toBe(4);
 });
 
 test("an allow reports resetAt as the time the bucket refills to full", () => {
@@ -60,7 +99,7 @@ test("an empty bucket denies with 429 and a retry-after", () => {
     expect(decision.resetAt).toEqual(new Date("2026-07-04T00:00:06.000Z"));
   }
   // a denied request consumes nothing.
-  expect(next.tokens).toBe(0);
+  expect((next as { tokens: number }).tokens).toBe(0);
 });
 
 test("refill never exceeds capacity", () => {

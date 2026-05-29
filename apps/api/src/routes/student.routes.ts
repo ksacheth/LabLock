@@ -479,6 +479,8 @@ app.post(
       const student = await authorizeRequest(_req, res, "student:submit");
       if (!student) return;
 
+      if (!rateLimitRequest(_req, res, "submit")) return;
+
       const session = await openSession(_req, res, examId, "submit");
       if (!session) return;
       const { attempt, now } = session;
