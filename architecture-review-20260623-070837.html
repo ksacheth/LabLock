@@ -1,0 +1,567 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Architecture review — LabLock</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script type="module">
+      import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs";
+      mermaid.initialize({ startOnLoad: true, theme: "neutral", securityLevel: "loose", flowchart: { useMaxWidth: true } });
+    </script>
+    <style>
+      .seam { stroke-dasharray: 6 5; }
+      .deep { background: linear-gradient(135deg, #0f172a, #1e293b); }
+      .chip { font-size: 0.66rem; letter-spacing: 0.04em; }
+      .label { font-size: 0.62rem; letter-spacing: 0.12em; text-transform: uppercase; }
+      .seamline { border-top: 2px dashed #94a3b8; }
+      .faded { opacity: 0.42; }
+      .arrow { stroke: #475569; stroke-width: 1.5; marker-end: url(#ah); }
+      .leakarrow { stroke: #dc2626; stroke-width: 1.75; marker-end: url(#ahr); }
+      pre.mermaid { background: transparent; }
+      html { scroll-behavior: smooth; }
+    </style>
+  </head>
+  <body class="bg-stone-50 text-slate-900 font-sans antialiased">
+    <svg width="0" height="0" class="absolute">
+      <defs>
+        <marker id="ah" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#475569"/></marker>
+        <marker id="ahr" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#dc2626"/></marker>
+      </defs>
+    </svg>
+
+    <main class="max-w-5xl mx-auto px-6 py-12 space-y-12">
+
+      <!-- ===================== HEADER ===================== -->
+      <header class="border-b border-slate-200 pb-8">
+        <div class="flex items-baseline justify-between flex-wrap gap-3">
+          <h1 class="font-serif text-4xl tracking-tight">Architecture review — <span class="text-indigo-700">LabLock</span></h1>
+          <span class="text-sm text-slate-500">2026-06-23 · deepening opportunities</span>
+        </div>
+        <p class="mt-3 text-slate-600 max-w-3xl">Seven candidates for turning shallow, scattered code into <strong>deep modules</strong> — a lot of behaviour behind a small interface, placed at a clean seam, testable through that interface. Ordered by leverage. Nothing here is implemented yet.</p>
+
+        <div class="mt-6 grid sm:grid-cols-2 gap-4">
+          <div class="rounded-lg border border-slate-200 bg-white p-4">
+            <div class="label text-slate-400 mb-3">Legend</div>
+            <div class="flex flex-wrap gap-x-6 gap-y-2 text-sm">
+              <span class="flex items-center gap-2"><span class="inline-block w-5 h-4 border border-slate-400 rounded-sm"></span> module</span>
+              <span class="flex items-center gap-2"><span class="inline-block w-5 h-0 border-t-2 border-dashed border-slate-400"></span> seam</span>
+              <span class="flex items-center gap-2"><span class="inline-block w-5 h-0 border-t-2 border-red-500"></span> leakage</span>
+              <span class="flex items-center gap-2"><span class="inline-block w-5 h-4 deep rounded-sm"></span> deep module</span>
+            </div>
+          </div>
+          <div class="rounded-lg border border-slate-200 bg-white p-4">
+            <div class="label text-slate-400 mb-3">The shape today</div>
+            <div class="flex flex-wrap gap-x-6 gap-y-1 text-sm text-slate-600">
+              <span><strong class="text-slate-900">3,157</strong> lines · <span class="font-mono text-xs">apps/api/src/index.ts</span></span>
+              <span><strong class="text-slate-900">1,829</strong> lines · <span class="font-mono text-xs">exam-room page</span></span>
+              <span><strong class="text-slate-900">0</strong> tests</span>
+              <span><strong class="text-slate-900">11</strong> Prisma models</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- quick index -->
+        <nav class="mt-6 flex flex-wrap gap-2 text-sm">
+          <a href="#c1" class="px-3 py-1 rounded-full bg-indigo-600 text-white">1 · The Judge</a>
+          <a href="#c2" class="px-3 py-1 rounded-full bg-white border border-slate-300 hover:border-slate-400">2 · Authorization seam</a>
+          <a href="#c3" class="px-3 py-1 rounded-full bg-white border border-slate-300 hover:border-slate-400">3 · Exam-session</a>
+          <a href="#c4" class="px-3 py-1 rounded-full bg-white border border-slate-300 hover:border-slate-400">4 · Error taxonomy</a>
+          <a href="#c5" class="px-3 py-1 rounded-full bg-white border border-slate-300 hover:border-slate-400">5 · Repository seam</a>
+          <a href="#c6" class="px-3 py-1 rounded-full bg-white border border-slate-300 hover:border-slate-400">6 · Client session</a>
+          <a href="#c7" class="px-3 py-1 rounded-full bg-white border border-slate-300 hover:border-slate-400">7 · Deploy + observe</a>
+        </nav>
+      </header>
+
+      <section id="candidates" class="space-y-12">
+
+        <!-- ===================== CANDIDATE 1 ===================== -->
+        <article id="c1" class="scroll-mt-6">
+          <div class="flex items-center gap-3 flex-wrap">
+            <h2 class="font-serif text-2xl">1 · Extract the Judge behind a sandbox seam</h2>
+            <span class="chip uppercase font-semibold px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-800">Strong</span>
+            <span class="chip uppercase font-semibold px-2.5 py-1 rounded-full bg-slate-200 text-slate-700">ports &amp; adapters</span>
+          </div>
+          <div class="mt-1.5 flex flex-wrap gap-1.5 chip text-slate-500">
+            <span class="px-2 py-0.5 rounded bg-stone-100">architecture</span>
+            <span class="px-2 py-0.5 rounded bg-stone-100">security</span>
+            <span class="px-2 py-0.5 rounded bg-stone-100">testing</span>
+            <span class="px-2 py-0.5 rounded bg-stone-100">product depth</span>
+          </div>
+          <p class="mt-3 font-mono text-sm text-slate-500">apps/api/src/index.ts — executeProcess <span class="text-slate-400">L395</span> · executeStudentCodeAgainstVisibleCases <span class="text-slate-400">L512</span> · outputsAreEquivalent <span class="text-slate-400">L328</span> · calculateWeightedQuestionScore <span class="text-slate-400">L83</span></p>
+
+          <div class="mt-5 grid md:grid-cols-2 gap-4">
+            <!-- BEFORE: mermaid mess -->
+            <div class="rounded-lg border border-slate-200 bg-white p-4">
+              <div class="label text-slate-400 mb-2">Before — shallow &amp; duplicated</div>
+              <pre class="mermaid" style="min-height:300px">
+flowchart TB
+  run["run handler<br/>L2155"] --> exec["executeStudentCode…<br/>146 lines, inline"]
+  sub["submit handler<br/>L2366"] --> exec
+  sub --> score["calculateWeightedScore"]
+  exec --> comp["compile + spawn()"]
+  exec --> cmp["outputsAreEquivalent"]
+  comp -. runs untrusted code .-> host[("API host process<br/>no sandbox")]
+  classDef leak stroke:#dc2626,stroke-width:2px,color:#b91c1c;
+  class comp,host leak
+              </pre>
+            </div>
+            <!-- AFTER: hand-built deep module -->
+            <div class="rounded-lg border border-slate-200 bg-white p-4 flex flex-col">
+              <div class="label text-slate-400 mb-2">After — one deep module on a seam</div>
+              <div class="flex-1 flex flex-col items-center justify-center gap-3">
+                <div class="text-center label text-slate-500">run &nbsp;·&nbsp; submit</div>
+                <svg height="18" width="20"><line x1="10" y1="0" x2="10" y2="16" class="arrow"/></svg>
+                <div class="deep text-white rounded-xl px-6 py-4 w-64 text-center shadow-lg">
+                  <div class="font-semibold tracking-wide">Judge</div>
+                  <div class="chip text-slate-300 mt-0.5">judge(submission, cases, limits) → Verdict</div>
+                  <div class="mt-3 flex flex-wrap justify-center gap-1 faded">
+                    <span class="chip px-1.5 py-0.5 rounded bg-white/10">compile</span>
+                    <span class="chip px-1.5 py-0.5 rounded bg-white/10">run</span>
+                    <span class="chip px-1.5 py-0.5 rounded bg-white/10">normalize</span>
+                    <span class="chip px-1.5 py-0.5 rounded bg-white/10">compare</span>
+                    <span class="chip px-1.5 py-0.5 rounded bg-white/10">score</span>
+                  </div>
+                </div>
+                <div class="w-64 seamline pt-2 text-center"><span class="label text-slate-400">Runner seam</span></div>
+                <div class="flex gap-2">
+                  <span class="chip px-2 py-1 rounded border border-slate-300 bg-white">host</span>
+                  <span class="chip px-2 py-1 rounded border border-emerald-400 bg-emerald-50 text-emerald-800">sandbox</span>
+                  <span class="chip px-2 py-1 rounded border border-slate-300 bg-white">fake · tests</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="mt-4 grid md:grid-cols-2 gap-4 text-sm">
+            <p><span class="label text-slate-400">Problem</span><br/>Compile-spawn-compare-score is inlined in the 3,157-line server, runs untrusted native code on the host with only a timeout, and is duplicated across <span class="font-mono text-xs">run</span> and <span class="font-mono text-xs">submit</span>.</p>
+            <p><span class="label text-slate-400">Solution</span><br/>One <code>Judge</code> module: <code>judge(submission, cases, limits) → Verdict</code>. Put the execution environment at a <strong>Runner</strong> seam — host today, sandboxed container in prod, in-memory fake in tests.</p>
+          </div>
+          <ul class="mt-4 grid sm:grid-cols-2 gap-x-8 gap-y-1.5 text-sm text-slate-700 list-disc list-inside marker:text-indigo-400">
+            <li><strong>leverage:</strong> run + submit, one interface</li>
+            <li><strong>locality:</strong> judging bugs land in one module</li>
+            <li>interface is the test surface — fixtures in, verdict out</li>
+            <li>second adapter (sandbox) closes host code-exec hole</li>
+            <li><strong>deletion test:</strong> complexity reappears in 2 handlers</li>
+            <li>resume-grade: a real sandboxed-judge subsystem</li>
+          </ul>
+        </article>
+
+        <hr class="border-slate-200"/>
+
+        <!-- ===================== CANDIDATE 2 ===================== -->
+        <article id="c2" class="scroll-mt-6">
+          <div class="flex items-center gap-3 flex-wrap">
+            <h2 class="font-serif text-2xl">2 · Collapse authorization into one seam</h2>
+            <span class="chip uppercase font-semibold px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-800">Strong</span>
+            <span class="chip uppercase font-semibold px-2.5 py-1 rounded-full bg-slate-200 text-slate-700">in-process</span>
+          </div>
+          <div class="mt-1.5 flex flex-wrap gap-1.5 chip text-slate-500">
+            <span class="px-2 py-0.5 rounded bg-stone-100">security / auth</span>
+            <span class="px-2 py-0.5 rounded bg-stone-100">architecture</span>
+          </div>
+          <p class="mt-3 font-mono text-sm text-slate-500">apps/api/src/index.ts — rejectUnapprovedFaculty <span class="text-slate-400">L118</span> · ownership checks <span class="text-slate-400">L1319, 1626, 1799, 1857, 2054, 2118, 2926…</span> · middleware/auth.ts</p>
+
+          <div class="mt-5 grid md:grid-cols-2 gap-4">
+            <!-- BEFORE cross-section: repeated checks per handler -->
+            <div class="rounded-lg border border-slate-200 bg-white p-4">
+              <div class="label text-slate-400 mb-3">Before — every handler re-derives authz</div>
+              <div class="space-y-2">
+                <div class="border border-slate-300 rounded p-2">
+                  <div class="chip text-slate-500 mb-1">POST /exams/:id/questions</div>
+                  <div class="flex flex-wrap gap-1">
+                    <span class="chip px-1.5 py-0.5 rounded bg-red-50 text-red-700 border border-red-200">find user</span>
+                    <span class="chip px-1.5 py-0.5 rounded bg-red-50 text-red-700 border border-red-200">role?</span>
+                    <span class="chip px-1.5 py-0.5 rounded bg-red-50 text-red-700 border border-red-200">approved?</span>
+                    <span class="chip px-1.5 py-0.5 rounded bg-red-50 text-red-700 border border-red-200">owner?</span>
+                  </div>
+                </div>
+                <div class="border border-slate-300 rounded p-2">
+                  <div class="chip text-slate-500 mb-1">PATCH /exams/:id</div>
+                  <div class="flex flex-wrap gap-1">
+                    <span class="chip px-1.5 py-0.5 rounded bg-red-50 text-red-700 border border-red-200">find user</span>
+                    <span class="chip px-1.5 py-0.5 rounded bg-red-50 text-red-700 border border-red-200">role?</span>
+                    <span class="chip px-1.5 py-0.5 rounded bg-red-50 text-red-700 border border-red-200">approved?</span>
+                    <span class="chip px-1.5 py-0.5 rounded bg-red-50 text-red-700 border border-red-200">owner?</span>
+                  </div>
+                </div>
+                <div class="border border-slate-300 rounded p-2">
+                  <div class="chip text-slate-500 mb-1">POST /questions/:id/testcases</div>
+                  <div class="flex flex-wrap gap-1">
+                    <span class="chip px-1.5 py-0.5 rounded bg-red-50 text-red-700 border border-red-200">find user</span>
+                    <span class="chip px-1.5 py-0.5 rounded bg-red-50 text-red-700 border border-red-200">role?</span>
+                    <span class="chip px-1.5 py-0.5 rounded bg-red-50 text-red-700 border border-red-200">approved?</span>
+                    <span class="chip px-1.5 py-0.5 rounded bg-red-50 text-red-700 border border-red-200">owner?</span>
+                  </div>
+                </div>
+                <div class="text-center chip text-slate-400">…repeated 10+ times</div>
+              </div>
+            </div>
+            <!-- AFTER: one thick authorize band -->
+            <div class="rounded-lg border border-slate-200 bg-white p-4 flex flex-col">
+              <div class="label text-slate-400 mb-3">After — handlers delegate to one module</div>
+              <div class="space-y-2">
+                <div class="border border-slate-300 rounded p-2 flex items-center justify-between"><span class="chip text-slate-500">POST /exams/:id/questions</span><span class="chip text-indigo-600">→ authorize()</span></div>
+                <div class="border border-slate-300 rounded p-2 flex items-center justify-between"><span class="chip text-slate-500">PATCH /exams/:id</span><span class="chip text-indigo-600">→ authorize()</span></div>
+                <div class="border border-slate-300 rounded p-2 flex items-center justify-between"><span class="chip text-slate-500">POST /questions/:id/testcases</span><span class="chip text-indigo-600">→ authorize()</span></div>
+              </div>
+              <div class="mt-3 flex-1 flex items-end">
+                <div class="deep text-white rounded-xl px-5 py-4 w-full text-center">
+                  <div class="font-semibold tracking-wide">authorize(actor, action, resource)</div>
+                  <div class="chip text-slate-300 mt-1 faded">role · faculty-approval · ownership — hidden inside</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="mt-4 grid md:grid-cols-2 gap-4 text-sm">
+            <p><span class="label text-slate-400">Problem</span><br/>Role, faculty-approval and creator-ownership are re-checked inline in every protected handler; a new route silently forgets one.</p>
+            <p><span class="label text-slate-400">Solution</span><br/>A deep authorization module with a small interface — guard middleware or <code>authorize(actor, action, resource)</code> — hiding the rule set.</p>
+          </div>
+          <ul class="mt-4 grid sm:grid-cols-2 gap-x-8 gap-y-1.5 text-sm text-slate-700 list-disc list-inside marker:text-indigo-400">
+            <li><strong>locality:</strong> every rule in one module</li>
+            <li><strong>leverage:</strong> one interface, every route</li>
+            <li>new routes can't forget a check</li>
+            <li>interface is the test surface — allow/deny tables</li>
+          </ul>
+        </article>
+
+        <hr class="border-slate-200"/>
+
+        <!-- ===================== CANDIDATE 3 ===================== -->
+        <article id="c3" class="scroll-mt-6">
+          <div class="flex items-center gap-3 flex-wrap">
+            <h2 class="font-serif text-2xl">3 · One deep Exam-session module</h2>
+            <span class="chip uppercase font-semibold px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-800">Strong</span>
+            <span class="chip uppercase font-semibold px-2.5 py-1 rounded-full bg-slate-200 text-slate-700">in-process</span>
+          </div>
+          <div class="mt-1.5 flex flex-wrap gap-1.5 chip text-slate-500">
+            <span class="px-2 py-0.5 rounded bg-stone-100">architecture</span>
+            <span class="px-2 py-0.5 rounded bg-stone-100">error handling</span>
+          </div>
+          <p class="mt-3 font-mono text-sm text-slate-500">apps/api/src/index.ts — enter <span class="text-slate-400">L1584</span> · draft <span class="text-slate-400">L2806</span> · run <span class="text-slate-400">L2075</span> · submit <span class="text-slate-400">L2214</span> · violations <span class="text-slate-400">L1929</span> · deactivateExpiredExams <span class="text-slate-400">L170</span></p>
+
+          <div class="mt-5 grid md:grid-cols-2 gap-4">
+            <!-- BEFORE mermaid fan-out -->
+            <div class="rounded-lg border border-slate-200 bg-white p-4">
+              <div class="label text-slate-400 mb-2">Before — 5 handlers, same preconditions</div>
+              <pre class="mermaid" style="min-height:300px">
+flowchart LR
+  enter[enter] --> D[deactivateExpired]
+  draft[draft] --> D
+  run[run] --> D
+  submit[submit] --> D
+  viol[violations] --> D
+  enter --> E[eligibility]
+  run --> E
+  enter --> W[time window]
+  submit --> W
+  draft --> W
+  enter --> A[attempt status]
+  submit --> A
+  classDef hot fill:#fef2f2,stroke:#dc2626;
+  class D,E,W,A hot
+              </pre>
+            </div>
+            <!-- AFTER call-graph collapse -->
+            <div class="rounded-lg border border-slate-200 bg-white p-4 flex flex-col">
+              <div class="label text-slate-400 mb-2">After — collapsed into one call</div>
+              <div class="flex-1 flex flex-col items-center justify-center gap-2">
+                <div class="flex flex-wrap justify-center gap-1.5 max-w-xs">
+                  <span class="chip px-2 py-1 rounded border border-slate-300 bg-white">enter</span>
+                  <span class="chip px-2 py-1 rounded border border-slate-300 bg-white">draft</span>
+                  <span class="chip px-2 py-1 rounded border border-slate-300 bg-white">run</span>
+                  <span class="chip px-2 py-1 rounded border border-slate-300 bg-white">submit</span>
+                  <span class="chip px-2 py-1 rounded border border-slate-300 bg-white">violations</span>
+                </div>
+                <svg height="20" width="20"><line x1="10" y1="0" x2="10" y2="18" class="arrow"/></svg>
+                <div class="deep text-white rounded-xl px-6 py-4 w-64 text-center shadow-lg">
+                  <div class="font-semibold tracking-wide">openSession(student, examId)</div>
+                  <div class="chip text-slate-300 mt-1 faded">expire · eligibility · window · attempt</div>
+                </div>
+                <svg height="20" width="20"><line x1="10" y1="0" x2="10" y2="18" class="arrow"/></svg>
+                <div class="flex gap-2">
+                  <span class="chip px-2 py-1 rounded border border-emerald-400 bg-emerald-50 text-emerald-800">Session</span>
+                  <span class="chip px-2 py-1 rounded border border-amber-400 bg-amber-50 text-amber-800">Refusal</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="mt-4 grid md:grid-cols-2 gap-4 text-sm">
+            <p><span class="label text-slate-400">Problem</span><br/>Every student handler re-derives expire-stale, eligibility, time-window and attempt-status; "can this student act now?" has no home.</p>
+            <p><span class="label text-slate-400">Solution</span><br/>A deep <code>ExamSession</code> module: <code>openSession(student, examId) → Session | Refusal</code>. Handlers delegate and stop re-deriving.</p>
+          </div>
+          <ul class="mt-4 grid sm:grid-cols-2 gap-x-8 gap-y-1.5 text-sm text-slate-700 list-disc list-inside marker:text-indigo-400">
+            <li>5 handlers collapse to one call</li>
+            <li><strong>locality:</strong> exam-time rules in one module</li>
+            <li>refusals become one typed shape</li>
+            <li><strong>deletion test:</strong> rules reappear across 5 handlers</li>
+          </ul>
+        </article>
+
+        <hr class="border-slate-200"/>
+
+        <!-- ===================== CANDIDATE 4 ===================== -->
+        <article id="c4" class="scroll-mt-6">
+          <div class="flex items-center gap-3 flex-wrap">
+            <h2 class="font-serif text-2xl">4 · A typed error taxonomy with one mapping seam</h2>
+            <span class="chip uppercase font-semibold px-2.5 py-1 rounded-full bg-amber-100 text-amber-800">Worth exploring</span>
+            <span class="chip uppercase font-semibold px-2.5 py-1 rounded-full bg-slate-200 text-slate-700">in-process</span>
+          </div>
+          <div class="mt-1.5 flex flex-wrap gap-1.5 chip text-slate-500">
+            <span class="px-2 py-0.5 rounded bg-stone-100">error handling</span>
+            <span class="px-2 py-0.5 rounded bg-stone-100">observability</span>
+          </div>
+          <p class="mt-3 font-mono text-sm text-slate-500">apps/api/src/index.ts — ~30 ad-hoc res.status(…).json({error}) sites · global handler <span class="text-slate-400">L3147</span> · apps/web — no error.tsx</p>
+
+          <div class="mt-5 grid md:grid-cols-2 gap-4">
+            <!-- BEFORE: scattered response builders -->
+            <div class="rounded-lg border border-slate-200 bg-white p-4">
+              <div class="label text-slate-400 mb-3">Before — each handler hand-maps to HTTP</div>
+              <div class="grid grid-cols-2 gap-2">
+                <div class="border border-red-200 bg-red-50 rounded p-2 chip font-mono text-red-700">res.status(400)<br/>{errors:…}</div>
+                <div class="border border-red-200 bg-red-50 rounded p-2 chip font-mono text-red-700">res.status(403)<br/>{error:"…"}</div>
+                <div class="border border-red-200 bg-red-50 rounded p-2 chip font-mono text-red-700">res.status(404)<br/>{error:"…"}</div>
+                <div class="border border-red-200 bg-red-50 rounded p-2 chip font-mono text-red-700">res.status(429)<br/>{error:"…"}</div>
+                <div class="border border-red-200 bg-red-50 rounded p-2 chip font-mono text-red-700">res.status(500)<br/>generic</div>
+                <div class="border border-slate-200 rounded p-2 chip text-slate-400 flex items-center justify-center">…inconsistent shapes</div>
+              </div>
+            </div>
+            <!-- AFTER funnel -->
+            <div class="rounded-lg border border-slate-200 bg-white p-4 flex flex-col">
+              <div class="label text-slate-400 mb-3">After — throw typed, map once</div>
+              <div class="flex-1 flex flex-col items-center justify-center gap-1">
+                <div class="flex gap-2">
+                  <span class="chip font-mono px-2 py-1 rounded bg-stone-100">throw NotFound</span>
+                  <span class="chip font-mono px-2 py-1 rounded bg-stone-100">throw Forbidden</span>
+                  <span class="chip font-mono px-2 py-1 rounded bg-stone-100">throw Conflict</span>
+                </div>
+                <svg height="26" width="120" viewBox="0 0 120 26"><line x1="20" y1="0" x2="60" y2="24" class="arrow"/><line x1="60" y1="0" x2="60" y2="24" class="arrow"/><line x1="100" y1="0" x2="60" y2="24" class="arrow"/></svg>
+                <div class="deep text-white rounded-xl px-6 py-4 w-72 text-center shadow-lg">
+                  <div class="font-semibold tracking-wide">error mapper</div>
+                  <div class="chip text-slate-300 mt-1 faded">kind → status + stable JSON + log</div>
+                </div>
+                <svg height="20" width="20"><line x1="10" y1="0" x2="10" y2="18" class="arrow"/></svg>
+                <span class="chip px-3 py-1 rounded border border-emerald-400 bg-emerald-50 text-emerald-800 font-mono">{ error, code, requestId }</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="mt-4 grid md:grid-cols-2 gap-4 text-sm">
+            <p><span class="label text-slate-400">Problem</span><br/>Errors are raw strings hand-mapped to HTTP in ~30 places; the catch-all returns a contextless 500; the web client guesses from message text.</p>
+            <p><span class="label text-slate-400">Solution</span><br/>A small domain-error module (<code>throw new DomainError(kind, …)</code>) and one mapping adapter — the error middleware — plus a client <code>error.tsx</code> boundary.</p>
+          </div>
+          <ul class="mt-4 grid sm:grid-cols-2 gap-x-8 gap-y-1.5 text-sm text-slate-700 list-disc list-inside marker:text-indigo-400">
+            <li>one seam maps errors → HTTP</li>
+            <li>handlers throw, stop building responses</li>
+            <li>stable error shape for the web client</li>
+            <li>pairs with request-id logging (see #7)</li>
+          </ul>
+        </article>
+
+        <hr class="border-slate-200"/>
+
+        <!-- ===================== CANDIDATE 5 ===================== -->
+        <article id="c5" class="scroll-mt-6">
+          <div class="flex items-center gap-3 flex-wrap">
+            <h2 class="font-serif text-2xl">5 · A repository seam with an in-memory adapter</h2>
+            <span class="chip uppercase font-semibold px-2.5 py-1 rounded-full bg-amber-100 text-amber-800">Worth exploring</span>
+            <span class="chip uppercase font-semibold px-2.5 py-1 rounded-full bg-slate-200 text-slate-700">ports &amp; adapters</span>
+          </div>
+          <div class="mt-1.5 flex flex-wrap gap-1.5 chip text-slate-500">
+            <span class="px-2 py-0.5 rounded bg-stone-100">data model</span>
+            <span class="px-2 py-0.5 rounded bg-stone-100">testing</span>
+          </div>
+          <p class="mt-3 font-mono text-sm text-slate-500">packages/database/src/index.ts · ~20 scattered prisma.* calls with repeated <span class="text-slate-700">where: { deletedAt: null }</span></p>
+
+          <div class="mt-5 grid md:grid-cols-2 gap-4">
+            <!-- BEFORE mermaid -->
+            <div class="rounded-lg border border-slate-200 bg-white p-4">
+              <div class="label text-slate-400 mb-2">Before — handlers reach into Prisma</div>
+              <pre class="mermaid" style="min-height:300px">
+flowchart TB
+  h1[handler] --> p[("Prisma / Postgres")]
+  h2[handler] --> p
+  h3[handler] --> p
+  h4[handler] --> p
+  h1 -. "deletedAt:null" .-> p
+  h3 -. "deletedAt:null" .-> p
+  classDef leak stroke:#dc2626,stroke-width:1.5px,color:#b91c1c;
+  class h1,h3 leak
+              </pre>
+            </div>
+            <!-- AFTER mermaid ports/adapters -->
+            <div class="rounded-lg border border-slate-200 bg-white p-4">
+              <div class="label text-slate-400 mb-2">After — one interface, two adapters</div>
+              <pre class="mermaid" style="min-height:300px">
+flowchart TB
+  h1[handler] --> R
+  h2[handler] --> R
+  h3[handler] --> R
+  R["ExamRepo / SubmissionRepo<br/>interface"]:::deep
+  R --> pg[("Prisma — prod")]
+  R --> mem[["in-memory — tests"]]
+  classDef deep fill:#0f172a,color:#fff,stroke:#0f172a;
+              </pre>
+            </div>
+          </div>
+
+          <div class="mt-4 grid md:grid-cols-2 gap-4 text-sm">
+            <p><span class="label text-slate-400">Problem</span><br/>Data access is scattered Prisma calls repeating the same soft-delete filters; nothing testable without a live Postgres.</p>
+            <p><span class="label text-slate-400">Solution</span><br/>Repository modules over persistence. Prisma adapter in prod, in-memory adapter in tests — the second adapter is what makes #1–#3 testable without a DB.</p>
+          </div>
+          <div class="mt-3 rounded-md bg-amber-50 border border-amber-200 px-3 py-2 text-sm text-amber-900">⚠ <strong>Seam discipline:</strong> a repo that only forwards <span class="font-mono text-xs">prisma.exam.findUnique</span> fails the deletion test. It earns its keep only by absorbing the repeated filters, soft-delete and "latest-submission" queries.</div>
+          <ul class="mt-4 grid sm:grid-cols-2 gap-x-8 gap-y-1.5 text-sm text-slate-700 list-disc list-inside marker:text-indigo-400">
+            <li>in-memory adapter unlocks DB-free tests</li>
+            <li>absorbs repeated soft-delete filters</li>
+            <li>two adapters justify the seam</li>
+            <li>data-model fixes land in one module</li>
+          </ul>
+        </article>
+
+        <hr class="border-slate-200"/>
+
+        <!-- ===================== CANDIDATE 6 ===================== -->
+        <article id="c6" class="scroll-mt-6">
+          <div class="flex items-center gap-3 flex-wrap">
+            <h2 class="font-serif text-2xl">6 · One client Session + typed API module</h2>
+            <span class="chip uppercase font-semibold px-2.5 py-1 rounded-full bg-amber-100 text-amber-800">Worth exploring</span>
+            <span class="chip uppercase font-semibold px-2.5 py-1 rounded-full bg-slate-200 text-slate-700">ports &amp; adapters</span>
+          </div>
+          <div class="mt-1.5 flex flex-wrap gap-1.5 chip text-slate-500">
+            <span class="px-2 py-0.5 rounded bg-stone-100">frontend architecture</span>
+            <span class="px-2 py-0.5 rounded bg-stone-100">security</span>
+          </div>
+          <p class="mt-3 font-mono text-sm text-slate-500">apps/web — 50+ localStorage.getItem("token") · axios calls per page · per-page interface redefinitions · @common/types unused by web</p>
+
+          <div class="mt-5 grid md:grid-cols-2 gap-4">
+            <!-- BEFORE fan -->
+            <div class="rounded-lg border border-slate-200 bg-white p-4">
+              <div class="label text-slate-400 mb-3">Before — every page wires its own</div>
+              <div class="grid grid-cols-2 gap-2">
+                <div class="border border-slate-300 rounded p-2 chip">dashboard <span class="text-red-600">· token · axios</span></div>
+                <div class="border border-slate-300 rounded p-2 chip">exam room <span class="text-red-600">· token · axios</span></div>
+                <div class="border border-slate-300 rounded p-2 chip">login <span class="text-red-600">· token · axios</span></div>
+                <div class="border border-slate-300 rounded p-2 chip">teacher <span class="text-red-600">· token · axios</span></div>
+                <div class="border border-slate-300 rounded p-2 chip">results <span class="text-red-600">· token · axios</span></div>
+                <div class="border border-slate-300 rounded p-2 chip">admin <span class="text-red-600">· token · axios</span></div>
+              </div>
+              <div class="mt-2 text-center chip text-slate-400">role guard copy-pasted into each useEffect</div>
+            </div>
+            <!-- AFTER two modules -->
+            <div class="rounded-lg border border-slate-200 bg-white p-4 flex flex-col">
+              <div class="label text-slate-400 mb-3">After — pages consume two interfaces</div>
+              <div class="flex-1 flex flex-col items-center justify-center gap-2">
+                <div class="flex flex-wrap justify-center gap-1.5 max-w-xs">
+                  <span class="chip px-2 py-1 rounded border border-slate-300 bg-white">dashboard</span>
+                  <span class="chip px-2 py-1 rounded border border-slate-300 bg-white">exam room</span>
+                  <span class="chip px-2 py-1 rounded border border-slate-300 bg-white">teacher</span>
+                  <span class="chip px-2 py-1 rounded border border-slate-300 bg-white">admin</span>
+                </div>
+                <svg height="18" width="20"><line x1="10" y1="0" x2="10" y2="16" class="arrow"/></svg>
+                <div class="flex gap-2 w-full">
+                  <div class="deep text-white rounded-lg px-3 py-3 flex-1 text-center">
+                    <div class="chip font-semibold">Session</div>
+                    <div class="chip text-slate-300 faded mt-0.5">user · role · guard</div>
+                  </div>
+                  <div class="deep text-white rounded-lg px-3 py-3 flex-1 text-center">
+                    <div class="chip font-semibold">apiClient</div>
+                    <div class="chip text-slate-300 faded mt-0.5">url · auth · errors</div>
+                  </div>
+                </div>
+                <div class="w-full seamline pt-2 text-center"><span class="label text-slate-400">@common/types — shared contract</span></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="mt-4 grid md:grid-cols-2 gap-4 text-sm">
+            <p><span class="label text-slate-400">Problem</span><br/>No module knows "who is logged in" or "how to call the API"; every page re-reads localStorage, re-guards by role and re-declares response types.</p>
+            <p><span class="label text-slate-400">Solution</span><br/>A <code>Session</code> context (one source of truth, expiry-driven logout) and a typed <code>apiClient</code>, both speaking the existing <code>@common/types</code> Zod schemas.</p>
+          </div>
+          <ul class="mt-4 grid sm:grid-cols-2 gap-x-8 gap-y-1.5 text-sm text-slate-700 list-disc list-inside marker:text-indigo-400">
+            <li>one source of truth for current user</li>
+            <li>delete 50+ localStorage reads</li>
+            <li>one interface hides base URL + auth</li>
+            <li><code>@common/types</code> becomes a real api↔web seam</li>
+          </ul>
+        </article>
+
+        <hr class="border-slate-200"/>
+
+        <!-- ===================== CANDIDATE 7 ===================== -->
+        <article id="c7" class="scroll-mt-6">
+          <div class="flex items-center gap-3 flex-wrap">
+            <h2 class="font-serif text-2xl">7 · Make it deployable &amp; observable</h2>
+            <span class="chip uppercase font-semibold px-2.5 py-1 rounded-full bg-amber-100 text-amber-800">Worth exploring</span>
+            <span class="chip uppercase font-semibold px-2.5 py-1 rounded-full bg-slate-200 text-slate-700">in-process</span>
+          </div>
+          <div class="mt-1.5 flex flex-wrap gap-1.5 chip text-slate-500">
+            <span class="px-2 py-0.5 rounded bg-stone-100">observability</span>
+            <span class="px-2 py-0.5 rounded bg-stone-100">deployment readiness</span>
+          </div>
+          <p class="mt-3 font-mono text-sm text-slate-500">console.* logging · process.env.JWT_SECRET! unchecked at boot · shallow /health (no DB ping) · no Dockerfile · no .github/workflows</p>
+
+          <div class="mt-5 grid md:grid-cols-2 gap-4">
+            <!-- BEFORE -->
+            <div class="rounded-lg border border-slate-200 bg-white p-4">
+              <div class="label text-slate-400 mb-3">Before — blind in production</div>
+              <div class="space-y-2 text-sm">
+                <div class="flex items-center gap-2"><span class="text-red-500">✕</span> console.log, no request id to correlate</div>
+                <div class="flex items-center gap-2"><span class="text-red-500">✕</span> <span class="font-mono text-xs">env.JWT_SECRET!</span> — crashes on first login if unset</div>
+                <div class="flex items-center gap-2"><span class="text-red-500">✕</span> /health returns ok without touching the DB</div>
+                <div class="flex items-center gap-2"><span class="text-red-500">✕</span> no Dockerfile, no CI gate on push</div>
+                <div class="flex items-center gap-2 text-slate-400 chip pt-1">note: .env is correctly gitignored — not committed; rotate the local Neon key before sharing</div>
+              </div>
+            </div>
+            <!-- AFTER pipeline -->
+            <div class="rounded-lg border border-slate-200 bg-white p-4 flex flex-col justify-center">
+              <div class="label text-slate-400 mb-3">After — a deep config + request-context module, then infra</div>
+              <div class="space-y-2">
+                <div class="deep text-white rounded-lg px-3 py-2 chip flex items-center justify-between"><span class="font-semibold">config</span><span class="text-slate-300 faded">env validated once → typed</span></div>
+                <div class="deep text-white rounded-lg px-3 py-2 chip flex items-center justify-between"><span class="font-semibold">requestContext</span><span class="text-slate-300 faded">request-id on every log + error</span></div>
+                <div class="border border-emerald-300 bg-emerald-50 rounded-lg px-3 py-2 chip flex items-center justify-between text-emerald-800"><span class="font-semibold">/health</span><span>pings the database</span></div>
+                <div class="seamline pt-2"></div>
+                <div class="flex items-center gap-2 text-xs font-mono text-slate-500 flex-wrap">
+                  <span class="px-2 py-1 rounded bg-stone-100">Dockerfile</span> →
+                  <span class="px-2 py-1 rounded bg-stone-100">compose</span> →
+                  <span class="px-2 py-1 rounded bg-stone-100">CI: lint→types→test→build</span>
+                </div>
+                <div class="chip text-slate-400">infra above the line is enabling, not a deepening</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="mt-4 grid md:grid-cols-2 gap-4 text-sm">
+            <p><span class="label text-slate-400">Problem</span><br/>An incident can't be traced — no correlation id, no DB-aware health, secrets read ad-hoc — and there's no Dockerfile or CI to ship or gate the code.</p>
+            <p><span class="label text-slate-400">Solution</span><br/>Deepen two modules — a typed <code>config</code> validated at boot and a <code>requestContext</code> that stamps an id onto every log and error — then add Dockerfile, compose and a CI workflow.</p>
+          </div>
+          <ul class="mt-4 grid sm:grid-cols-2 gap-x-8 gap-y-1.5 text-sm text-slate-700 list-disc list-inside marker:text-indigo-400">
+            <li>request-id on every log + error</li>
+            <li>typed config validated once at boot</li>
+            <li>/health pings the database</li>
+            <li>Dockerfile + CI — enabling infra</li>
+          </ul>
+        </article>
+      </section>
+
+      <!-- ===================== TOP RECOMMENDATION ===================== -->
+      <section id="top-recommendation">
+        <div class="rounded-2xl deep text-white p-8 shadow-xl">
+          <div class="label text-indigo-300">Top recommendation</div>
+          <h2 class="font-serif text-3xl mt-2">Start with #1 — the Judge behind a sandbox seam.</h2>
+          <p class="mt-3 text-slate-300 max-w-3xl">It is the one cut that pays in every direction the brief asks for: it carves the largest deep module out of the monolith, closes the most serious security hole (untrusted code on the host), and turns the hardest-to-test logic into one interface that takes fixtures and returns a verdict. It is also the single most resume-legible subsystem in the codebase — "I built a sandboxed code judge" reads better than any refactor.</p>
+          <p class="mt-3 text-slate-300 max-w-3xl">Natural pairing: <a href="#c5" class="underline decoration-indigo-400">#5 (in-memory repository adapter)</a> is the enabler that lets the Judge — and #2, #3 — be tested without a live Postgres. If you'd rather show breadth first, <a href="#c2" class="underline decoration-indigo-400">#2 (authorization seam)</a> is the cheapest high-leverage win.</p>
+          <div class="mt-5 flex gap-3">
+            <a href="#c1" class="px-4 py-2 rounded-lg bg-white text-slate-900 font-medium hover:bg-slate-100">Jump to #1 →</a>
+            <a href="#c5" class="px-4 py-2 rounded-lg border border-white/30 hover:bg-white/10">Pairs with #5</a>
+          </div>
+        </div>
+      </section>
+
+      <footer class="text-center text-xs text-slate-400 pt-4 pb-8">
+        Architecture review generated for LabLock · vocabulary: module · interface · depth · seam · adapter · leverage · locality · No ADRs present, so no decisions re-litigated.
+      </footer>
+    </main>
+  </body>
+</html>
