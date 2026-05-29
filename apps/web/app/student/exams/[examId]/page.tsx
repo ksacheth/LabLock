@@ -577,6 +577,7 @@ interface RoomQuestion {
   orderIndex: number;
   timeLimitMs: number;
   memoryLimitKb: number;
+  samples: { input: string; expectedOutput: string }[];
   draft: {
     id: string;
     code: string;
@@ -1492,6 +1493,50 @@ export default function StudentExamRoomPage() {
                           {activeQuestion.description}
                         </div>
                       </div>
+
+                      {activeQuestion.samples.length > 0 ? (
+                        <div className="mt-6">
+                          <h3 className="mb-1 text-sm font-black uppercase tracking-wide text-slate-700">
+                            Examples
+                          </h3>
+                          <p className="mb-3 text-xs text-slate-500">
+                            Read input from standard input (stdin) and print to
+                            standard output (stdout). The first line gives the
+                            array size N; read it, then read the N values (e.g.
+                            with a loop).
+                          </p>
+                          <div className="space-y-4">
+                            {activeQuestion.samples.map((sample, sampleIndex) => (
+                              <div
+                                key={sampleIndex}
+                                className="overflow-hidden rounded-lg border border-slate-200"
+                              >
+                                <div className="border-b border-slate-200 bg-slate-50 px-3 py-1.5 text-[11px] font-bold uppercase tracking-wide text-slate-500">
+                                  Example {sampleIndex + 1}
+                                </div>
+                                <div className="grid grid-cols-1 gap-px bg-slate-200 sm:grid-cols-2">
+                                  <div className="bg-white">
+                                    <div className="px-3 py-1.5 text-[11px] font-bold uppercase tracking-wide text-slate-400">
+                                      Input
+                                    </div>
+                                    <pre className="m-0 overflow-x-auto px-3 pb-3 font-mono text-[13px] leading-5 text-slate-800">
+                                      {sample.input}
+                                    </pre>
+                                  </div>
+                                  <div className="bg-white">
+                                    <div className="px-3 py-1.5 text-[11px] font-bold uppercase tracking-wide text-slate-400">
+                                      Output
+                                    </div>
+                                    <pre className="m-0 overflow-x-auto px-3 pb-3 font-mono text-[13px] leading-5 text-slate-800">
+                                      {sample.expectedOutput}
+                                    </pre>
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      ) : null}
                     </div>
                   </>
                 ) : (
@@ -1607,11 +1652,11 @@ export default function StudentExamRoomPage() {
                       <pre
                         ref={editorLineNumberRef}
                         aria-hidden="true"
-                        className="m-0 px-3 py-6 text-right font-mono text-[15px] leading-relaxed text-slate-500 select-none"
+                        className="m-0 px-3 py-6 text-right font-mono text-[15px] leading-6 text-slate-500 select-none"
                         style={{
                           tabSize: 4,
                           fontFamily:
-                            "'JetBrains Mono', 'Fira Code', 'Courier New', monospace",
+                            "ui-monospace, SFMono-Regular, Menlo, Consolas, 'Courier New', monospace",
                         }}
                       >
                         {editorLineNumbers.join("\n")}
@@ -1620,14 +1665,20 @@ export default function StudentExamRoomPage() {
                     <pre
                       ref={editorHighlightRef}
                       aria-hidden="true"
-                      className="pointer-events-none absolute inset-0 m-0 overflow-hidden break-normal py-6 pr-6 pl-20 font-mono text-[15px] leading-relaxed text-slate-300"
+                      className="pointer-events-none absolute inset-0 m-0 overflow-hidden break-normal py-6 pr-6 pl-20 font-mono text-[15px] leading-6 text-slate-300"
                       style={{
                         tabSize: 4,
                         fontFamily:
-                          "'JetBrains Mono', 'Fira Code', 'Courier New', monospace",
+                          "ui-monospace, SFMono-Regular, Menlo, Consolas, 'Courier New', monospace",
                       }}
                     >
                       <code
+                        style={{
+                          fontFamily: "inherit",
+                          fontSize: "inherit",
+                          lineHeight: "inherit",
+                          tabSize: 4,
+                        }}
                         dangerouslySetInnerHTML={{
                           __html: highlightedEditorHtml,
                         }}
@@ -1646,12 +1697,12 @@ export default function StudentExamRoomPage() {
                       onCut={handleCopyCut}
                       readOnly={roomEnded}
                       spellCheck={false}
-                      className="absolute inset-0 h-full w-full resize-none overflow-auto whitespace-pre break-normal bg-transparent py-6 pr-6 pl-20 font-mono text-[15px] leading-relaxed text-transparent caret-white outline-none selection:bg-blue-500/30 placeholder:text-slate-600 read-only:cursor-not-allowed"
+                      className="absolute inset-0 h-full w-full resize-none overflow-auto whitespace-pre break-normal bg-transparent py-6 pr-6 pl-20 font-mono text-[15px] leading-6 text-transparent caret-white outline-none selection:bg-blue-500/30 placeholder:text-slate-600 read-only:cursor-not-allowed"
                       placeholder="Write your solution here..."
                       style={{
                         tabSize: 4,
                         fontFamily:
-                          "'JetBrains Mono', 'Fira Code', 'Courier New', monospace",
+                          "ui-monospace, SFMono-Regular, Menlo, Consolas, 'Courier New', monospace",
                       }}
                     />
                   </div>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import axios, { AxiosError } from "axios";
@@ -10,6 +10,14 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
 const REQUIRED_ROLE = "FACULTY";
 
 export default function TeacherLogin() {
+  return (
+    <Suspense fallback={null}>
+      <TeacherLoginForm />
+    </Suspense>
+  );
+}
+
+function TeacherLoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [email, setEmail] = useState("");
