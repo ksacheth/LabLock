@@ -13,6 +13,11 @@ import { registerQuestionRoutes } from "./routes/question.routes.ts";
 import { registerTestcaseRoutes } from "./routes/testcase.routes.ts";
 import { registerFacultyRoutes } from "./routes/faculty.routes.ts";
 import { registerStudentRoutes } from "./routes/student.routes.ts";
+import { getRunnerMode } from "./execution/runner-selection.ts";
+import {
+  preflightSandbox,
+  startOrphanSweeper,
+} from "./execution/sandbox-runner.ts";
 
 const app: Express = express();
 const PORT = process.env.PORT ?? 4000;
@@ -63,8 +68,22 @@ app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
 });
 
 // ─── Start Server ────────────────────────────────────────────────────────────
-app.listen(PORT, () => {
-  console.log(`[api] Server running at http://localhost:${PORT}`);
+// When RUNNER=sandbox, verify Docker + the sandbox image BEFORE listening and
+// refuse to start otherwise — there is deliberately no host fallback (ADR-0006).
+// Then reap any containers orphaned by a prior crashed process (boot + interval).
+async function boot() {
+  if (getRunnerMode() === "sandbox") {
+    await preflightSandbox();
+    startOrphanSweeper();
+  }
+  app.listen(PORT, () => {
+    console.log(`[api] Server running at http://localhost:${PORT}`);
+  });
+}
+
+boot().catch((error) => {
+  console.error("[api] Failed to start:", error);
+  process.exit(1);
 });
 
 export default app;

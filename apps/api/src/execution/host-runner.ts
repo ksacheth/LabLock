@@ -214,4 +214,6 @@ const hostRunner: Runner = {
   },
 };
 
-export { hostRunner };
+// Exported so the sandbox adapter reuses the same language/execution-plan
+// knowledge (compile + run commands) instead of duplicating it. See ADR-0006.
+export { hostRunner, getExecutionPlan };
