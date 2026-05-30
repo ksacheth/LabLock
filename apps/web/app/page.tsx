@@ -20,7 +20,8 @@ export default function NITKProctoringPage() {
                       Secure Online Examination for NITK Excellence
                     </h1>
                     <p className="text-slate-600 dark:text-slate-400 text-lg md:text-xl font-normal leading-relaxed max-w-[540px]">
-                      Experience the next generation of academic integrity with centeralised lab Examinator website.
+                      Experience the next generation of academic integrity with
+                      a centralised lab examination platform.
                     </p>
                   </div>
                   <div className="flex flex-wrap gap-4">
@@ -38,6 +39,65 @@ export default function NITKProctoringPage() {
               </div>
             </div>
           </div>
+
+          <section id="solutions" className="px-6 md:px-20 py-16">
+            <div className="max-w-[1200px] mx-auto grid gap-6 md:grid-cols-3">
+              {[
+                [
+                  "Secure exam room",
+                  "Fullscreen and tab-switch detection keep lab attempts accountable.",
+                ],
+                [
+                  "Online compiler",
+                  "Students write, run, and submit code from one locked workflow.",
+                ],
+                [
+                  "Teacher controls",
+                  "Faculty create exams, host sessions, and export results.",
+                ],
+              ].map(([title, body]) => (
+                <div
+                  key={title}
+                  className="rounded-2xl border border-primary/10 bg-white p-6 shadow-sm dark:bg-slate-800"
+                >
+                  <h2 className="text-lg font-black text-primary">{title}</h2>
+                  <p className="mt-3 text-sm leading-6 text-slate-600 dark:text-slate-300">
+                    {body}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </section>
+
+          <section id="institutions" className="px-6 md:px-20 py-10">
+            <div className="max-w-[1200px] mx-auto rounded-[2rem] border border-primary/10 bg-white p-8 dark:bg-slate-800 md:p-12">
+              <h2 className="text-3xl font-black text-primary">
+                Designed for campus labs
+              </h2>
+              <p className="mt-4 max-w-3xl text-slate-600 dark:text-slate-300">
+                LabLock maps exams to departments and batches, so administrators
+                can provision cohorts while faculty focus on question authoring
+                and live assessment.
+              </p>
+            </div>
+          </section>
+
+          <section id="resources" className="px-6 md:px-20 py-10">
+            <div className="max-w-[1200px] mx-auto grid gap-4 md:grid-cols-2">
+              <Link
+                href="/auth/teacher/login"
+                className="rounded-2xl border border-primary/10 bg-white p-6 font-bold text-primary hover:bg-primary/5 dark:bg-slate-800"
+              >
+                Teacher login →
+              </Link>
+              <Link
+                href="/auth/student/login"
+                className="rounded-2xl border border-primary/10 bg-white p-6 font-bold text-primary hover:bg-primary/5 dark:bg-slate-800"
+              >
+                Student login →
+              </Link>
+            </div>
+          </section>
 
           <div className="px-6 md:px-20 py-20">
             <div className="max-w-[1200px] mx-auto">
@@ -57,9 +117,12 @@ export default function NITKProctoringPage() {
                     </p>
                   </div>
                   <div className="flex flex-wrap justify-center gap-4">
-                    <button className="flex min-w-[200px] cursor-pointer items-center justify-center rounded-xl h-14 px-8 bg-white text-primary text-lg font-bold hover:bg-background-light shadow-xl transition-all">
+                    <Link
+                      href="/auth"
+                      className="flex min-w-[200px] cursor-pointer items-center justify-center rounded-xl h-14 px-8 bg-white text-primary text-lg font-bold hover:bg-background-light shadow-xl transition-all"
+                    >
                       Create Free Account
-                    </button>
+                    </Link>
                     {/* <button className="flex min-w-[200px] cursor-pointer items-center justify-center rounded-xl h-14 px-8 bg-primary border border-white/30 text-white text-lg font-bold hover:bg-white/10 transition-all">
                       Contact Sales
                     </button> */}
@@ -69,154 +132,6 @@ export default function NITKProctoringPage() {
             </div>
           </div>
         </main>
-
-        {/* <footer className="bg-white dark:bg-background-dark border-t border-primary/5 px-6 md:px-20 py-12">
-          <div className="max-w-[1200px] mx-auto grid grid-cols-1 md:grid-cols-4 gap-12">
-            <div className="flex flex-col gap-4">
-              <div className="flex items-center gap-2 text-primary">
-                <span className="material-symbols-outlined"></span>
-                <h2 className="text-xl font-bold">NITK Surathkal</h2>
-              </div>
-              <p className="text-slate-500 text-sm leading-relaxed">
-                National Institute of Technology Karnataka, Surathkal.
-                Department of Information Technology Lab Examination Initiative.
-              </p>
-            </div>
-            <div>
-              <h4 className="text-primary font-bold mb-6">Product</h4>
-              <ul className="flex flex-col gap-4 text-slate-500 text-sm">
-                <li>
-                  <Link
-                    href="#"
-                    className="hover:text-primary transition-colors"
-                  >
-                    AI Monitoring
-                  </Link>
-                </li>
-                <li>
-                  <Link
-                    href="#"
-                    className="hover:text-primary transition-colors"
-                  >
-                    Live Monitoring
-                  </Link>
-                </li>
-                <li>
-                  <Link
-                    href="#"
-                    className="hover:text-primary transition-colors"
-                  >
-                    Integrations
-                  </Link>
-                </li>
-                <li>
-                  <Link
-                    href="#"
-                    className="hover:text-primary transition-colors"
-                  >
-                    Enterprise
-                  </Link>
-                </li>
-              </ul>
-            </div>
-            <div>
-              <h4 className="text-primary font-bold mb-6">Department</h4>
-              <ul className="flex flex-col gap-4 text-slate-500 text-sm">
-                <li>
-                  <Link
-                    href="#"
-                    className="hover:text-primary transition-colors"
-                  >
-                    Case Studies
-                  </Link>
-                </li>
-                <li>
-                  <Link
-                    href="#"
-                    className="hover:text-primary transition-colors"
-                  >
-                    Implementation
-                  </Link>
-                </li>
-                <li>
-                  <Link
-                    href="#"
-                    className="hover:text-primary transition-colors"
-                  >
-                    Security
-                  </Link>
-                </li>
-                <li>
-                  <Link
-                    href="#"
-                    className="hover:text-primary transition-colors"
-                  >
-                    Privacy Policy
-                  </Link>
-                </li>
-              </ul>
-            </div>
-            <div>
-              <h4 className="text-primary font-bold mb-6">Support</h4>
-              <ul className="flex flex-col gap-4 text-slate-500 text-sm">
-                <li>
-                  <Link
-                    href="#"
-                    className="hover:text-primary transition-colors"
-                  >
-                    Help Center
-                  </Link>
-                </li>
-                <li>
-                  <Link
-                    href="#"
-                    className="hover:text-primary transition-colors"
-                  >
-                    Contact Us
-                  </Link>
-                </li>
-                <li>
-                  <Link
-                    href="#"
-                    className="hover:text-primary transition-colors"
-                  >
-                    API Docs
-                  </Link>
-                </li>
-                <li>
-                  <Link
-                    href="#"
-                    className="hover:text-primary transition-colors"
-                  >
-                    Status
-                  </Link>
-                </li>
-              </ul>
-            </div>
-          </div>
-          <div className="max-w-[1200px] mx-auto mt-12 pt-8 border-t border-primary/5 flex flex-col md:flex-row justify-between items-center gap-4">
-            <p className="text-slate-400 text-xs">
-              © 2024 National Institute of Technology Karnataka. All rights
-              reserved.
-            </p>
-            <div className="flex gap-6">
-              <Link
-                href="#"
-                className="text-slate-400 hover:text-primary transition-colors"
-              >
-                <span className="material-symbols-outlined text-xl">
-                  language
-                </span>
-              </Link>
-              <Link
-                href="#"
-                className="text-slate-400 hover:text-primary transition-colors"
-              >
-                <span className="material-symbols-outlined text-xl">share</span>
-              </Link>
-            </div>
-          </div>
-        </footer> */}
       </div>
     </div>
   );
