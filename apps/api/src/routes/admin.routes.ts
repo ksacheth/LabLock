@@ -4,32 +4,20 @@ import { DepartmentSchema, BatchSchema, AdminUpdateUserSchema } from "@common/ty
 import { authMiddleware } from "../middleware/auth.ts";
 import { authorizeRequest } from "../authorization/authorize-request.ts";
 
-async function requireAdmin(_req: Request, res: Response, next: NextFunction) {
-  const actor = await authorizeRequest(_req, res, "user:admin");
-  if (!actor) return;
-  next();
-}
-
-function registerUserListRoute(app: Express) {
-  app.get(
-    "/api/users",
-    authMiddleware,
-    requireAdmin,
-    async (_req: Request, res: Response, next: NextFunction) => {
-      try {
-        const users = await prisma.user.findMany({
-          omit: { password: true },
-        });
-        res.json(users);
-      } catch (error) {
-        next(error);
-      }
-    },
-  );
-}
-
 export function registerAdminRoutes(app: Express) {
-registerUserListRoute(app);
+app.get(
+  "/api/users",
+  async (_req: Request, res: Response, next: NextFunction) => {
+    try {
+      const users = await prisma.user.findMany({
+        omit: { password: true },
+      });
+      res.json(users);
+    } catch (error) {
+      next(error);
+    }
+  },
+);
 
 app.post(
   "/api/admin/departments",

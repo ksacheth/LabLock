@@ -3,11 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
-export default function TeacherNavbar({
-  activePage,
-}: {
-  activePage: "dashboard" | "exams" | "reports" | "settings";
-}) {
+export default function TeacherNavbar({ activePage }: { activePage: "dashboard" | "exams" | "reports" | "settings" }) {
   const router = useRouter();
 
   const handleSignOut = () => {
@@ -20,7 +16,7 @@ export default function TeacherNavbar({
     { label: "Dashboard", href: "/teacher/dashboard", key: "dashboard" },
     { label: "Exams", href: "/teacher/exams", key: "exams" },
     { label: "Reports", href: "/teacher/results", key: "reports" },
-    { label: "Settings", href: "/teacher/settings", key: "settings" },
+    { label: "Settings", href: "#", key: "settings" },
   ] as const;
 
   return (
@@ -57,15 +53,13 @@ export default function TeacherNavbar({
               >
                 {item.label}
               </Link>
-            ),
+            )
           )}
         </nav>
       </div>
       <div className="flex flex-1 justify-end gap-4 items-center">
         <div className="hidden md:flex items-center bg-primary/5 dark:bg-white/5 rounded-lg px-3 py-1.5 border border-primary/10">
-          <span className="material-symbols-outlined text-slate-400 text-xl">
-            search
-          </span>
+          <span className="material-symbols-outlined text-slate-400 text-xl">search</span>
           <input
             className="bg-transparent border-none focus:ring-0 text-sm w-48 placeholder:text-slate-400 outline-none"
             placeholder="Search students..."
