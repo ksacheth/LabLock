@@ -18,11 +18,11 @@ Owns all UI and client-side flows. Does not own domain rules — those are enfor
 ## Local Contracts
 
 - **Route / role map** (each page is a `"use client"` component):
-  - `app/auth/` — public login/signup + role selection (`/auth`, `/auth/<role>/login`,
-    `.../signup`). Stores JWT + user in `localStorage`.
+  - `app/auth/` + `app/pricing/` — public login/signup + role selection (`/auth`, `/auth/<role>/login`,
+    `.../signup`) and the public pricing page. Auth stores JWT + user in `localStorage`.
   - `app/admin/dashboard/` — ADMIN console (departments / batches / users / faculty approval).
   - `app/teacher/` — FACULTY: `dashboard` (create/host/monitor), `exams` (question +
-    test-case editor via `?examId=`), `results` (leaderboard + CSV export).
+    test-case editor via `?examId=`), `results` (leaderboard + CSV export), `settings` (account/session controls).
   - `app/student/` — STUDENT: `dashboard`, `exams/[examId]/instructions` (consent gate),
     `exams/[examId]/page.tsx` (the locked-down exam room), `exams/entry-access.ts`.
   - `app/components/` — shared `PublicHeader`, `TeacherNavbar`.
