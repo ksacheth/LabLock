@@ -2,18 +2,14 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import axios from "axios";
+import axios, { AxiosError } from "axios";
 import TeacherNavbar from "../../components/TeacherNavbar";
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
-const REQUIRED_ROLE = "FACULTY";
-
-function getDashboardPathForRole(role: string) {
-  if (role === "STUDENT") return "/student/dashboard";
-  if (role === "FACULTY") return "/teacher/dashboard";
-  if (role === "ADMIN") return "/admin/dashboard";
-  return "/auth";
-}
+import {
+  API_URL,
+  FACULTY_PENDING_APPROVAL_CODE,
+  TEACHER_REQUIRED_ROLE as REQUIRED_ROLE,
+  getDashboardPathForRole,
+} from "../../lib/auth";
 
 interface User {
   id: string;
@@ -21,6 +17,29 @@ interface User {
   email: string;
   role: string;
   facultyApproved?: boolean;
+}
+
+interface SettingsLoadFailureHandlers {
+  onPendingApproval: () => void;
+  onError: () => void;
+}
+
+function handleSettingsLoadFailure(
+  err: unknown,
+  handlers: SettingsLoadFailureHandlers,
+) {
+  const ax = err as AxiosError<{ code?: string; error?: string }>;
+  if (
+    ax.response?.status === 403 &&
+    ax.response?.data?.code === FACULTY_PENDING_APPROVAL_CODE
+  ) {
+    localStorage.removeItem("token");
+    localStorage.removeItem("user");
+    handlers.onPendingApproval();
+    return;
+  }
+
+  handlers.onError();
 }
 
 function AccountSettings({
@@ -105,7 +124,13 @@ export default function TeacherSettingsPage() {
         }
         setUser(res.data);
       })
-      .catch(() => setError("Failed to load settings."))
+      .catch((err) =>
+        handleSettingsLoadFailure(err, {
+          onPendingApproval: () =>
+            router.replace("/auth/teacher/login?pending=1"),
+          onError: () => setError("Failed to load settings."),
+        }),
+      )
       .finally(() => setLoading(false));
   }, [router]);
 

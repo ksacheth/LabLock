@@ -5,9 +5,13 @@ import { authMiddleware } from "../middleware/auth.ts";
 import { authorizeRequest } from "../authorization/authorize-request.ts";
 
 async function requireAdmin(_req: Request, res: Response, next: NextFunction) {
-  const actor = await authorizeRequest(_req, res, "user:admin");
-  if (!actor) return;
-  next();
+  try {
+    const actor = await authorizeRequest(_req, res, "user:admin");
+    if (!actor) return;
+    next();
+  } catch (error) {
+    next(error);
+  }
 }
 
 function registerUserListRoute(app: Express) {
