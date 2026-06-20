@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import axios, { AxiosError } from "axios";
 import PublicHeader from "../../../components/PublicHeader";
 
@@ -11,11 +11,20 @@ const REQUIRED_ROLE = "FACULTY";
 
 export default function TeacherLogin() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (searchParams.get("pending") === "1") {
+      setError(
+        "Faculty access requires administrator approval. If you were signed out, wait until your account is activated, then sign in again.",
+      );
+    }
+  }, [searchParams]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -33,7 +42,10 @@ export default function TeacherLogin() {
 
       router.push("/teacher/dashboard");
     } catch (err) {
-      const axiosErr = err as AxiosError<{ error?: string }>;
+      const axiosErr = err as AxiosError<{
+        error?: string;
+        code?: string;
+      }>;
       setError(
         axiosErr.response?.data?.error ?? "Sign in failed. Please try again.",
       );

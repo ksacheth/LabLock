@@ -9,6 +9,16 @@ import { buildStudentExamInstructionsPath } from "../exams/entry-access";
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
 const REQUIRED_ROLE = "STUDENT";
 
+function logDashboardEvent(
+  event: string,
+  details?: Record<string, string | number | boolean | null>,
+) {
+  console.info(`[StudentDashboard] ${event}`, {
+    timestamp: new Date().toISOString(),
+    ...details,
+  });
+}
+
 function getDashboardPathForRole(role: string) {
   if (role === "STUDENT") return "/student/dashboard";
   if (role === "FACULTY") return "/teacher/dashboard";
@@ -81,6 +91,9 @@ export default function LabProctorDashboard() {
   useEffect(() => {
     const token = getToken();
     if (!token) {
+      logDashboardEvent("auth.missing_token_redirect", {
+        redirectTo: "/auth/student/login",
+      });
       router.replace("/auth/student/login");
       return;
     }
@@ -89,11 +102,16 @@ export default function LabProctorDashboard() {
       try {
         const parsedUser = JSON.parse(stored) as User;
         if (parsedUser.role !== REQUIRED_ROLE) {
+          logDashboardEvent("auth.role_mismatch_stored_user_redirect", {
+            role: parsedUser.role ?? null,
+            redirectTo: getDashboardPathForRole(parsedUser.role),
+          });
           router.replace(getDashboardPathForRole(parsedUser.role));
           return;
         }
         setUser(parsedUser);
       } catch {
+        logDashboardEvent("auth.invalid_stored_user_cleared");
         localStorage.removeItem("user");
       }
     }
@@ -109,12 +127,21 @@ export default function LabProctorDashboard() {
         ]);
         if (!isActive) return;
         if (meRes.data.role !== REQUIRED_ROLE) {
+          logDashboardEvent("auth.role_mismatch_server_user_redirect", {
+            role: meRes.data.role ?? null,
+            redirectTo: getDashboardPathForRole(meRes.data.role),
+          });
           router.replace(getDashboardPathForRole(meRes.data.role));
           return;
         }
         setUser(meRes.data);
         setExams(examsRes.data);
-      } catch {
+        logDashboardEvent("data.initial_load_success", {
+          userId: meRes.data.id,
+          examCount: examsRes.data.length,
+        });
+      } catch (error) {
+        console.error("[StudentDashboard] data.initial_load_failed", error);
         // keep stored user, show empty state
       } finally {
         if (isActive) {
@@ -140,13 +167,22 @@ export default function LabProctorDashboard() {
   }, []);
 
   const handleLogout = () => {
+    logDashboardEvent("auth.logout_clicked", {
+      userId: user?.id ?? null,
+    });
     localStorage.removeItem("token");
     localStorage.removeItem("user");
     router.push("/auth/student/login");
   };
 
-  const enterExamRoom = (examId: string) => {
-    router.push(buildStudentExamInstructionsPath(examId));
+  const enterExamRoom = (exam: Exam) => {
+    const latestAttempt = getLatestAttempt(exam);
+    logDashboardEvent("exam.enter_room_clicked", {
+      examId: exam.id,
+      hasPreviousAttempt: Boolean(latestAttempt),
+      latestAttemptStatus: latestAttempt?.status ?? null,
+    });
+    router.push(buildStudentExamInstructionsPath(exam.id));
   };
 
   const liveExams = exams.filter((exam) => isExamLive(exam, currentTimeMs));
@@ -374,7 +410,7 @@ export default function LabProctorDashboard() {
                                 </div>
                                 <div className="flex items-center gap-4">
                                   <button
-                                    onClick={() => enterExamRoom(exam.id)}
+                                    onClick={() => enterExamRoom(exam)}
                                     disabled={isLocked}
                                     className="bg-primary text-white font-bold py-3 px-8 rounded-lg hover:bg-primary/90 transition-all flex items-center gap-2 group flex-1 justify-center disabled:cursor-not-allowed disabled:bg-slate-300 disabled:hover:bg-slate-300"
                                   >
@@ -460,30 +496,6 @@ export default function LabProctorDashboard() {
                         System Readiness
                       </h3>
                       <div className="space-y-4">
-                        <div className="flex items-center justify-between p-3 bg-white/10 rounded-lg">
-                          <div className="flex items-center gap-3">
-                            <span className="material-symbols-outlined text-accent">
-                              videocam
-                            </span>
-                            <span className="text-sm font-medium">Camera</span>
-                          </div>
-                          <span className="material-symbols-outlined text-green-400">
-                            check_circle
-                          </span>
-                        </div>
-                        <div className="flex items-center justify-between p-3 bg-white/10 rounded-lg">
-                          <div className="flex items-center gap-3">
-                            <span className="material-symbols-outlined text-accent">
-                              mic
-                            </span>
-                            <span className="text-sm font-medium">
-                              Microphone
-                            </span>
-                          </div>
-                          <span className="material-symbols-outlined text-green-400">
-                            check_circle
-                          </span>
-                        </div>
                         <div className="flex items-center justify-between p-3 bg-white/10 rounded-lg">
                           <div className="flex items-center gap-3">
                             <span className="material-symbols-outlined text-accent">

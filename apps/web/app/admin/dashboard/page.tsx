@@ -21,6 +21,7 @@ interface User {
   name: string;
   email: string;
   role: string;
+  facultyApproved?: boolean;
   departmentId?: string | null;
   batchId?: string | null;
   rollNumber?: string | null;
@@ -325,6 +326,20 @@ export default function AdminDashboard() {
     setShowUserModal(true);
   }
 
+  async function approveFacultyAccount(userId: string) {
+    try {
+      await axios.patch(
+        `${API_URL}/api/admin/users/${userId}`,
+        { facultyApproved: true },
+        { headers: getHeaders() },
+      );
+      addToast("Faculty account approved. They can now sign in to the teacher dashboard.", "success");
+      await fetchAll();
+    } catch (err) {
+      addToast(getApiError(err), "error");
+    }
+  }
+
   async function handleUpdateUser(e: FormEvent) {
     e.preventDefault();
     if (!editingUser) return;
@@ -379,6 +394,9 @@ export default function AdminDashboard() {
 
   const studentCount = users.filter((u) => u.role === "STUDENT").length;
   const facultyCount = users.filter((u) => u.role === "FACULTY").length;
+  const pendingFacultyCount = users.filter(
+    (u) => u.role === "FACULTY" && u.facultyApproved === false,
+  ).length;
   const adminCount = users.filter((u) => u.role === "ADMIN").length;
   const activeDepartments = departments.filter((d) => d.isActive).length;
   const activeBatches = batches.filter((b) => b.isActive).length;
@@ -535,6 +553,34 @@ export default function AdminDashboard() {
                       provisioned access across the online examination platform.
                     </p>
                   </header>
+
+                  {pendingFacultyCount > 0 ? (
+                    <div className="flex flex-col gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-5 py-4 dark:border-amber-900/50 dark:bg-amber-950/30 sm:flex-row sm:items-center sm:justify-between">
+                      <div className="flex items-start gap-3">
+                        <span className="material-symbols-outlined text-amber-600 dark:text-amber-400">
+                          pending_actions
+                        </span>
+                        <div>
+                          <p className="font-bold text-amber-900 dark:text-amber-100">
+                            {pendingFacultyCount} faculty registration
+                            {pendingFacultyCount === 1 ? "" : "s"} awaiting
+                            approval
+                          </p>
+                          <p className="mt-1 text-sm text-amber-800/90 dark:text-amber-200/80">
+                            Approve educator sign-ups so they can access the
+                            teacher dashboard.
+                          </p>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setActiveTab("users")}
+                        className="shrink-0 rounded-xl bg-amber-600 px-4 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-amber-700"
+                      >
+                        Review in Users
+                      </button>
+                    </div>
+                  ) : null}
 
                   {/* Stats Cards */}
                   <section className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-4">
@@ -1015,18 +1061,42 @@ export default function AdminDashboard() {
                             <p className="text-slate-600 dark:text-slate-400 truncate">
                               {u.email}
                             </p>
-                            <span className={roleBadge(u.role)}>
-                              {u.role}
-                            </span>
-                            <button
-                              onClick={() => openUserEditModal(u)}
-                              className={secondaryBtnClasses + " text-xs py-2 px-3"}
-                            >
-                              <span className="material-symbols-outlined text-[16px]">
-                                edit
+                            <div className="flex flex-col gap-1">
+                              <span className={roleBadge(u.role)}>
+                                {u.role}
                               </span>
-                              Edit
-                            </button>
+                              {u.role === "FACULTY" && u.facultyApproved === false ? (
+                                <span className="w-fit rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-amber-800 dark:bg-amber-900/40 dark:text-amber-200">
+                                  Pending approval
+                                </span>
+                              ) : null}
+                            </div>
+                            <div className="flex flex-wrap gap-2">
+                              {u.role === "FACULTY" &&
+                              u.facultyApproved === false ? (
+                                <button
+                                  type="button"
+                                  onClick={() => approveFacultyAccount(u.id)}
+                                  className="inline-flex items-center gap-1 rounded-xl bg-emerald-600 px-3 py-2 text-xs font-bold text-white shadow-sm transition hover:bg-emerald-700"
+                                >
+                                  <span className="material-symbols-outlined text-[16px]">
+                                    check_circle
+                                  </span>
+                                  Approve
+                                </button>
+                              ) : null}
+                              <button
+                                onClick={() => openUserEditModal(u)}
+                                className={
+                                  secondaryBtnClasses + " text-xs py-2 px-3"
+                                }
+                              >
+                                <span className="material-symbols-outlined text-[16px]">
+                                  edit
+                                </span>
+                                Edit
+                              </button>
+                            </div>
                           </div>
                         ))
                       )}

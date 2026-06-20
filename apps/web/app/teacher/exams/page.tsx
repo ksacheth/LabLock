@@ -26,9 +26,11 @@ interface Question {
   testCases?: TestCase[];
 }
 
-type PrepareTestCasesResult =
-  | { testCases: TestCase[] }
-  | { error: string };
+type PrepareTestCasesResult = { testCases: TestCase[] } | { error: string };
+
+function normalizeTestCaseText(value: string) {
+  return value.replace(/\r\n/g, "\n");
+}
 
 function prepareTestCasesForSave(
   testCases: TestCase[],
@@ -36,11 +38,12 @@ function prepareTestCasesForSave(
   const normalizedCases: TestCase[] = [];
 
   for (const [index, testCase] of testCases.entries()) {
-    const input = testCase.input.trim();
-    const expectedOutput = testCase.expectedOutput.trim();
+    const input = normalizeTestCaseText(testCase.input);
+    const expectedOutput = normalizeTestCaseText(testCase.expectedOutput);
     const weight = Number(testCase.weight);
     const rowNumber = index + 1;
-    const isCompletelyBlank = input === "" && expectedOutput === "";
+    const isCompletelyBlank =
+      input.trim() === "" && expectedOutput.trim() === "";
 
     if (isCompletelyBlank) {
       if (testCase.id) {
@@ -51,11 +54,11 @@ function prepareTestCasesForSave(
       continue;
     }
 
-    if (input === "") {
+    if (input.trim() === "") {
       return { error: `Test case ${rowNumber} is missing input.` };
     }
 
-    if (expectedOutput === "") {
+    if (expectedOutput.trim() === "") {
       return { error: `Test case ${rowNumber} is missing expected output.` };
     }
 
@@ -101,15 +104,18 @@ function ExamEditor() {
   const [memoryLimitKb, setMemoryLimitKb] = useState(256000);
   const [testCases, setTestCases] = useState<TestCase[]>([
     { input: "", expectedOutput: "", isHidden: false, weight: 1.0 },
-    { input: "", expectedOutput: "", isHidden: true, weight: 1.0 }
+    { input: "", expectedOutput: "", isHidden: true, weight: 1.0 },
   ]);
 
   const fetchQuestions = React.useCallback(async () => {
     try {
       const token = localStorage.getItem("token");
-      const { data } = await axios.get<Question[]>(`${API_URL}/api/exams/${examId}/questions`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const { data } = await axios.get<Question[]>(
+        `${API_URL}/api/exams/${examId}/questions`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        },
+      );
       setQuestions(data);
       if (data.length > 0 && activeIndex === -1) {
         selectQuestion(0, data);
@@ -133,7 +139,10 @@ function ExamEditor() {
     fetchQuestions();
   }, [examId, fetchQuestions]);
 
-  const selectQuestion = (index: number, questionList: Question[] = questions) => {
+  const selectQuestion = (
+    index: number,
+    questionList: Question[] = questions,
+  ) => {
     const q = questionList[index];
     if (q) {
       setTitle(q.title);
@@ -141,9 +150,11 @@ function ExamEditor() {
       setMarks(q.marks);
       setTimeLimitMs(q.timeLimitMs);
       setMemoryLimitKb(q.memoryLimitKb);
-      setTestCases(q.testCases?.length ? q.testCases : [
-        { input: "", expectedOutput: "", isHidden: false, weight: 1.0 }
-      ]);
+      setTestCases(
+        q.testCases?.length
+          ? q.testCases
+          : [{ input: "", expectedOutput: "", isHidden: false, weight: 1.0 }],
+      );
       setActiveIndex(index);
     }
   };
@@ -157,18 +168,22 @@ function ExamEditor() {
     setMemoryLimitKb(256000);
     setTestCases([
       { input: "", expectedOutput: "", isHidden: false, weight: 1.0 },
-      { input: "", expectedOutput: "", isHidden: true, weight: 1.0 }
+      { input: "", expectedOutput: "", isHidden: true, weight: 1.0 },
     ]);
   };
 
   const handleAddTestCase = () => {
     setTestCases([
-      ...testCases, 
-      { input: "", expectedOutput: "", isHidden: false, weight: 1.0 }
+      ...testCases,
+      { input: "", expectedOutput: "", isHidden: false, weight: 1.0 },
     ]);
   };
 
-  const updateTestCase = <K extends keyof TestCase>(index: number, field: K, value: TestCase[K]) => {
+  const updateTestCase = <K extends keyof TestCase>(
+    index: number,
+    field: K,
+    value: TestCase[K],
+  ) => {
     const newCases = [...testCases];
     newCases[index] = { ...newCases[index], [field]: value } as TestCase;
     setTestCases(newCases);
@@ -212,12 +227,12 @@ function ExamEditor() {
             marks: Number(marks),
             timeLimitMs: Number(timeLimitMs),
             memoryLimitKb: Number(memoryLimitKb),
-            orderIndex: questions.length + 1
+            orderIndex: questions.length + 1,
           },
-          { headers }
+          { headers },
         );
         questionId = qData.id;
-        
+
         // Add Test Cases sequentially
         for (const tc of validTestCases) {
           await axios.post(
@@ -226,12 +241,11 @@ function ExamEditor() {
               input: tc.input,
               expectedOutput: tc.expectedOutput,
               isHidden: tc.isHidden,
-              weight: Number(tc.weight)
+              weight: Number(tc.weight),
             },
-            { headers }
+            { headers },
           );
         }
-        
       } else {
         // Update existing question
         await axios.patch(
@@ -241,27 +255,35 @@ function ExamEditor() {
             description,
             marks: Number(marks),
             timeLimitMs: Number(timeLimitMs),
-            memoryLimitKb: Number(memoryLimitKb)
+            memoryLimitKb: Number(memoryLimitKb),
           },
-          { headers }
+          { headers },
         );
 
         // Update Test Cases
         for (const tc of validTestCases) {
           if (tc.id) {
-            await axios.patch(`${API_URL}/api/testcases/${tc.id}`, {
-              input: tc.input,
-              expectedOutput: tc.expectedOutput,
-              isHidden: tc.isHidden,
-              weight: Number(tc.weight)
-            }, { headers });
+            await axios.patch(
+              `${API_URL}/api/testcases/${tc.id}`,
+              {
+                input: tc.input,
+                expectedOutput: tc.expectedOutput,
+                isHidden: tc.isHidden,
+                weight: Number(tc.weight),
+              },
+              { headers },
+            );
           } else {
-            await axios.post(`${API_URL}/api/questions/${questionId}/testcases`, {
-              input: tc.input,
-              expectedOutput: tc.expectedOutput,
-              isHidden: tc.isHidden,
-              weight: Number(tc.weight)
-            }, { headers });
+            await axios.post(
+              `${API_URL}/api/questions/${questionId}/testcases`,
+              {
+                input: tc.input,
+                expectedOutput: tc.expectedOutput,
+                isHidden: tc.isHidden,
+                weight: Number(tc.weight),
+              },
+              { headers },
+            );
           }
         }
       }
@@ -269,14 +291,15 @@ function ExamEditor() {
       await fetchQuestions();
       setSaveSuccess(true);
       setTimeout(() => setSaveSuccess(false), 3000);
-
     } catch (error) {
       console.error("Failed to save question", error);
       if (axios.isAxiosError(error)) {
-        const data = error.response?.data as {
-          error?: string;
-          errors?: Record<string, string[]>;
-        } | undefined;
+        const data = error.response?.data as
+          | {
+              error?: string;
+              errors?: Record<string, string[]>;
+            }
+          | undefined;
         if (data?.errors) {
           setSaveError(Object.values(data.errors).flat().join(" "));
         } else {
@@ -302,7 +325,17 @@ function ExamEditor() {
       );
       router.push("/teacher/dashboard");
     } catch (error) {
-      if (axios.isAxiosError(error)) { if (axios.isAxiosError(error)) { setSaveError(error.response?.data?.error || "Failed to publish exam."); } else { setSaveError("Failed to publish exam."); } } else { setSaveError("Failed to publish exam."); }
+      if (axios.isAxiosError(error)) {
+        if (axios.isAxiosError(error)) {
+          setSaveError(
+            error.response?.data?.error || "Failed to publish exam.",
+          );
+        } else {
+          setSaveError("Failed to publish exam.");
+        }
+      } else {
+        setSaveError("Failed to publish exam.");
+      }
     } finally {
       setPublishing(false);
     }
@@ -313,7 +346,7 @@ function ExamEditor() {
       <div className="flex-1 flex items-center justify-center min-h-[50vh]">
         <div className="text-center space-y-4">
           <p className="text-slate-500 font-medium text-lg">No Exam Selected</p>
-          <button 
+          <button
             onClick={() => router.push("/teacher/dashboard")}
             className="px-6 py-2 bg-primary text-white rounded-lg font-bold hover:bg-primary/90"
           >
@@ -357,35 +390,43 @@ function ExamEditor() {
             {/* Question List/Stepper */}
             <div className="space-y-1">
               {loading ? (
-                <div className="px-3 py-2 text-sm text-slate-400">Loading questions...</div>
+                <div className="px-3 py-2 text-sm text-slate-400">
+                  Loading questions...
+                </div>
               ) : (
                 <>
                   {questions.map((q, idx) => (
-                    <button 
+                    <button
                       key={q.id}
                       onClick={() => selectQuestion(idx)}
                       className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all ${
-                        activeIndex === idx 
-                        ? "bg-primary text-white shadow-lg shadow-primary/20"
-                        : "text-slate-600 dark:text-slate-300 hover:bg-primary/5"
+                        activeIndex === idx
+                          ? "bg-primary text-white shadow-lg shadow-primary/20"
+                          : "text-slate-600 dark:text-slate-300 hover:bg-primary/5"
                       }`}
                     >
-                      <span className="text-xs font-bold">{String(idx + 1).padStart(2, '0')}</span>
+                      <span className="text-xs font-bold">
+                        {String(idx + 1).padStart(2, "0")}
+                      </span>
                       <span className="text-sm font-medium truncate flex-1 text-left">
                         {q.title || "Untitled Question"}
                       </span>
-                      <span className={`material-symbols-outlined text-xs ml-auto ${
-                        activeIndex === idx ? "text-white" : "text-green-500"
-                      }`}>
+                      <span
+                        className={`material-symbols-outlined text-xs ml-auto ${
+                          activeIndex === idx ? "text-white" : "text-green-500"
+                        }`}
+                      >
                         {activeIndex === idx ? "edit" : "check_circle"}
                       </span>
                     </button>
                   ))}
-                  
+
                   {/* Active New Question Slot */}
                   {activeIndex === questions.length && (
                     <button className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg bg-primary/10 text-primary border-l-4 border-primary">
-                      <span className="text-xs font-bold">{String(questions.length + 1).padStart(2, '0')}</span>
+                      <span className="text-xs font-bold">
+                        {String(questions.length + 1).padStart(2, "0")}
+                      </span>
                       <span className="text-sm font-semibold truncate flex-1 text-left">
                         New Question
                       </span>
@@ -401,7 +442,7 @@ function ExamEditor() {
         </div>
 
         <div className="mt-auto">
-          <button 
+          <button
             onClick={handleAddNewSlot}
             className="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-xl border-2 border-dashed border-primary/30 text-primary font-bold text-sm hover:bg-primary/5 transition-colors"
           >
@@ -415,7 +456,9 @@ function ExamEditor() {
       <main className="flex-1 p-4 md:p-8 lg:p-12 max-w-5xl mx-auto w-full overflow-y-auto">
         {activeIndex === -1 ? (
           <div className="flex-1 flex flex-col items-center justify-center h-full text-slate-400 min-h-[50vh]">
-            <span className="material-symbols-outlined text-6xl mb-4 opacity-50">post_add</span>
+            <span className="material-symbols-outlined text-6xl mb-4 opacity-50">
+              post_add
+            </span>
             <p>Select a question or create a new one to get started.</p>
           </div>
         ) : (
@@ -428,7 +471,11 @@ function ExamEditor() {
                   <span className="material-symbols-outlined text-xs">
                     chevron_right
                   </span>
-                  <span>{activeIndex < questions.length ? 'Edit Question' : 'Create New'}</span>
+                  <span>
+                    {activeIndex < questions.length
+                      ? "Edit Question"
+                      : "Create New"}
+                  </span>
                 </nav>
                 <h1 className="text-3xl font-extrabold text-slate-900 dark:text-slate-100 tracking-tight">
                   Question {activeIndex + 1}: {title || "Untitled"}
@@ -447,7 +494,9 @@ function ExamEditor() {
                   className="flex items-center gap-2 px-6 py-2.5 rounded-lg bg-primary text-white font-bold text-sm hover:opacity-90 disabled:opacity-50 transition-opacity shadow-lg shadow-primary/20"
                 >
                   {publishing ? (
-                    <span className="material-symbols-outlined animate-spin text-sm">progress_activity</span>
+                    <span className="material-symbols-outlined animate-spin text-sm">
+                      progress_activity
+                    </span>
                   ) : null}
                   Publish Exam
                 </button>
@@ -537,10 +586,19 @@ function ExamEditor() {
                         Test Cases
                       </h3>
                       <p className="text-xs font-medium text-slate-500">
-                        Provide at least 1 test case for comprehensive grading
+                        Provide at least 1 test case. Prefer Codeforces-style
+                        stdin like{" "}
+                        <code className="font-mono text-[11px]">
+                          4{"\n"}2 7 11 15{"\n"}9
+                        </code>
+                        . Existing JSON-style arrays such as{" "}
+                        <code className="font-mono text-[11px]">
+                          [2,7,11,15]
+                        </code>{" "}
+                        are auto-expanded to size plus values during runs.
                       </p>
                     </div>
-                    <button 
+                    <button
                       onClick={handleAddTestCase}
                       className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-secondary/10 text-primary font-bold text-xs hover:bg-secondary/20 transition-colors"
                     >
@@ -552,9 +610,12 @@ function ExamEditor() {
                   </div>
 
                   {testCases.map((tc, idx) => (
-                    <div key={idx} className="p-5 rounded-xl border border-primary/10 bg-background-light dark:bg-slate-800/50 space-y-4 relative group">
+                    <div
+                      key={idx}
+                      className="p-5 rounded-xl border border-primary/10 bg-background-light dark:bg-slate-800/50 space-y-4 relative group"
+                    >
                       <div className="absolute top-4 right-4 flex gap-2">
-                        <button 
+                        <button
                           onClick={() => removeTestCase(idx)}
                           className="text-slate-400 hover:text-red-500 transition-colors bg-white dark:bg-slate-900 rounded p-1 shadow-sm border border-slate-200 dark:border-slate-700"
                         >
@@ -563,32 +624,48 @@ function ExamEditor() {
                           </span>
                         </button>
                       </div>
-                      
+
                       <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 mb-2">
-                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase ${
-                          tc.isHidden ? "bg-slate-400 text-white" : "bg-primary text-white"
-                        }`}>
+                        <span
+                          className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase ${
+                            tc.isHidden
+                              ? "bg-slate-400 text-white"
+                              : "bg-primary text-white"
+                          }`}
+                        >
                           Test Case {idx + 1}
                         </span>
-                        
+
                         <label className="flex items-center gap-1.5 cursor-pointer mt-2 sm:mt-0">
-                          <input 
-                            type="checkbox" 
+                          <input
+                            type="checkbox"
                             checked={tc.isHidden}
-                            onChange={(e) => updateTestCase(idx, 'isHidden', e.target.checked)}
+                            onChange={(e) =>
+                              updateTestCase(idx, "isHidden", e.target.checked)
+                            }
                             className="rounded text-primary focus:ring-primary border-slate-300"
                           />
-                          <span className="text-xs font-medium text-slate-600 dark:text-slate-400">Hidden from Students</span>
+                          <span className="text-xs font-medium text-slate-600 dark:text-slate-400">
+                            Hidden from Students
+                          </span>
                         </label>
-                        
+
                         <div className="flex items-center gap-1.5 sm:ml-4 mt-2 sm:mt-0">
-                          <label className="text-xs font-medium text-slate-600 dark:text-slate-400">Weight:</label>
-                          <input 
-                            type="number" 
+                          <label className="text-xs font-medium text-slate-600 dark:text-slate-400">
+                            Weight:
+                          </label>
+                          <input
+                            type="number"
                             step="0.1"
                             min="0.1"
                             value={tc.weight}
-                            onChange={(e) => updateTestCase(idx, 'weight', Number(e.target.value))}
+                            onChange={(e) =>
+                              updateTestCase(
+                                idx,
+                                "weight",
+                                Number(e.target.value),
+                              )
+                            }
                             className="w-16 px-2 py-0.5 text-xs rounded border border-primary/10 bg-white dark:bg-slate-900 focus:ring-1 focus:ring-primary outline-none"
                           />
                         </div>
@@ -601,10 +678,12 @@ function ExamEditor() {
                           </label>
                           <textarea
                             value={tc.input}
-                            onChange={(e) => updateTestCase(idx, 'input', e.target.value)}
+                            onChange={(e) =>
+                              updateTestCase(idx, "input", e.target.value)
+                            }
                             className="w-full p-3 rounded-lg border border-primary/10 bg-white dark:bg-slate-900 focus:ring-1 focus:ring-primary outline-none text-sm font-mono"
-                            placeholder="Input values..."
-                            rows={3}
+                            placeholder={"4\n2 7 11 15\n9"}
+                            rows={4}
                           />
                         </div>
                         <div className="space-y-2">
@@ -613,7 +692,13 @@ function ExamEditor() {
                           </label>
                           <textarea
                             value={tc.expectedOutput}
-                            onChange={(e) => updateTestCase(idx, 'expectedOutput', e.target.value)}
+                            onChange={(e) =>
+                              updateTestCase(
+                                idx,
+                                "expectedOutput",
+                                e.target.value,
+                              )
+                            }
                             className="w-full p-3 rounded-lg border border-primary/10 bg-white dark:bg-slate-900 focus:ring-1 focus:ring-primary outline-none text-sm font-mono"
                             placeholder="Output values..."
                             rows={3}
@@ -622,10 +707,12 @@ function ExamEditor() {
                       </div>
                     </div>
                   ))}
-                  
+
                   {testCases.length === 0 && (
                     <div className="text-center p-6 border border-dashed border-primary/20 rounded-xl bg-background-light dark:bg-slate-800 mt-4">
-                      <p className="text-slate-500 text-sm">No test cases added. Please add at least one test case.</p>
+                      <p className="text-slate-500 text-sm">
+                        No test cases added. Please add at least one test case.
+                      </p>
                     </div>
                   )}
                 </div>
@@ -640,20 +727,26 @@ function ExamEditor() {
                   disabled={activeIndex === 0}
                   className="flex items-center gap-2 text-primary font-bold text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  <span className="material-symbols-outlined">chevron_left</span>
+                  <span className="material-symbols-outlined">
+                    chevron_left
+                  </span>
                   Previous
                 </button>
 
                 <div className="flex flex-col items-center gap-1">
                   {saveError && (
                     <p className="text-red-600 dark:text-red-400 text-xs font-medium flex items-center gap-1">
-                      <span className="material-symbols-outlined text-sm">error</span>
+                      <span className="material-symbols-outlined text-sm">
+                        error
+                      </span>
                       {saveError}
                     </p>
                   )}
                   {saveSuccess && (
                     <p className="text-green-600 text-xs font-medium flex items-center gap-1">
-                      <span className="material-symbols-outlined text-sm">check_circle</span>
+                      <span className="material-symbols-outlined text-sm">
+                        check_circle
+                      </span>
                       Question saved successfully!
                     </p>
                   )}
@@ -665,7 +758,11 @@ function ExamEditor() {
                   className="flex items-center gap-2 bg-primary text-white px-6 py-2.5 rounded-lg font-bold text-sm shadow-md shadow-primary/10 disabled:opacity-70"
                 >
                   {saving ? "Saving..." : "Save & Next"}
-                  {!saving && <span className="material-symbols-outlined">chevron_right</span>}
+                  {!saving && (
+                    <span className="material-symbols-outlined">
+                      chevron_right
+                    </span>
+                  )}
                 </button>
               </div>
             </div>
@@ -696,11 +793,15 @@ export default function ExamPortalDashboard() {
   return (
     <div className="bg-background-light dark:bg-background-dark text-slate-900 dark:text-slate-100 min-h-screen">
       <TeacherNavbar activePage="exams" />
-      <Suspense fallback={
-        <div className="flex items-center justify-center min-h-[50vh]">
-          <span className="material-symbols-outlined animate-spin text-4xl text-primary">progress_activity</span>
-        </div>
-      }>
+      <Suspense
+        fallback={
+          <div className="flex items-center justify-center min-h-[50vh]">
+            <span className="material-symbols-outlined animate-spin text-4xl text-primary">
+              progress_activity
+            </span>
+          </div>
+        }
+      >
         <ExamEditor />
       </Suspense>
     </div>

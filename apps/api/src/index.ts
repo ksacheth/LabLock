@@ -13,6 +13,7 @@ import prisma from "@repo/database";
 import bcrypt from "bcryptjs";
 import {
   UserSchema,
+  FacultySignupSchema,
   ExamSchema,
   UpdateExamSchema,
   DepartmentSchema,
@@ -79,8 +80,59 @@ type StudentRunExecutionResult = {
   storedTestCaseResults: StoredTestCaseResult[];
 };
 
+function calculateWeightedQuestionScore(
+  questionMarks: number,
+  weightedCases: Array<{ id: string; weight: number }>,
+  storedResults: StoredTestCaseResult[],
+  executionStatus: ExecutionSubmissionStatus,
+): number {
+  if (weightedCases.length === 0) return 0;
+  if (executionStatus === "COMPILE_ERROR") return 0;
+  const totalWeight = weightedCases.reduce((s, t) => s + t.weight, 0);
+  if (totalWeight <= 0) return 0;
+  let earnedWeight = 0;
+  for (const tc of weightedCases) {
+    const r = storedResults.find((x) => x.testCaseId === tc.id);
+    if (r?.passed) earnedWeight += tc.weight;
+  }
+  return (earnedWeight / totalWeight) * questionMarks;
+}
+
 const COMPILATION_TIMEOUT_MS = 15_000;
 const PROCESS_OUTPUT_LIMIT = 16_000;
+
+function logApiEvent(
+  event: string,
+  details?: Record<string, string | number | boolean | null>,
+) {
+  console.info(`[api] ${event}`, {
+    timestamp: new Date().toISOString(),
+    ...details,
+  });
+}
+
+const FACULTY_PENDING_MSG =
+  "Your faculty account is pending admin approval. You can use the teacher dashboard after an administrator activates your account.";
+
+/** Returns true if the response was already sent (caller should return). */
+function rejectUnapprovedFaculty(
+  res: Response,
+  user: { role: string; facultyApproved: boolean } | null,
+  notFacultyMessage: string,
+): boolean {
+  if (!user || user.role !== "FACULTY") {
+    res.status(403).json({ error: notFacultyMessage });
+    return true;
+  }
+  if (!user.facultyApproved) {
+    res.status(403).json({
+      error: FACULTY_PENDING_MSG,
+      code: "FACULTY_PENDING_APPROVAL",
+    });
+    return true;
+  }
+  return false;
+}
 
 function isPortalRole(value: unknown): value is PortalRole {
   return typeof value === "string" && value in portalLabelByRole;
@@ -93,6 +145,15 @@ function isStudentProgrammingLanguage(
     typeof value === "string" &&
     studentProgrammingLanguages.includes(value as StudentProgrammingLanguage)
   );
+}
+
+function toStudentProgrammingLanguage(
+  value: string | undefined | null,
+): StudentProgrammingLanguage {
+  if (value && isStudentProgrammingLanguage(value)) {
+    return value;
+  }
+  return "PYTHON3";
 }
 
 function calculateExamEndTime(startTime: Date, durationMin: number) {
@@ -136,6 +197,184 @@ function appendProcessOutput(current: string, chunk: string) {
 
 function normalizeExecutionOutput(value: string) {
   return value.replace(/\r\n/g, "\n").trimEnd();
+}
+
+function normalizeExecutionInput(value: string) {
+  return value.replace(/\r\n/g, "\n");
+}
+
+function isPrimitiveCompetitiveInputValue(
+  value: unknown,
+): value is string | number | boolean | bigint | null {
+  return (
+    value === null ||
+    typeof value === "string" ||
+    typeof value === "number" ||
+    typeof value === "boolean" ||
+    typeof value === "bigint"
+  );
+}
+
+function expandArrayStyleInputLine(line: string) {
+  const trimmedLine = line.trim();
+
+  if (!trimmedLine.startsWith("[") || !trimmedLine.endsWith("]")) {
+    return null;
+  }
+
+  try {
+    const parsedValue = JSON.parse(trimmedLine);
+
+    if (
+      !Array.isArray(parsedValue) ||
+      !parsedValue.every((item) => isPrimitiveCompetitiveInputValue(item))
+    ) {
+      return null;
+    }
+
+    const serializedValues = parsedValue.map((item) =>
+      item === null ? "null" : String(item),
+    );
+
+    return [String(parsedValue.length), serializedValues.join(" ")].join("\n");
+  } catch {
+    return null;
+  }
+}
+
+function formatExecutionInputForCompetitiveProgramming(value: string) {
+  return normalizeExecutionInput(value)
+    .split("\n")
+    .map((line) => expandArrayStyleInputLine(line) ?? line)
+    .join("\n");
+}
+
+function normalizeStructuredExecutionValue(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    return value.map((item) => normalizeStructuredExecutionValue(item));
+  }
+
+  if (value && typeof value === "object") {
+    return Object.keys(value as Record<string, unknown>)
+      .sort()
+      .reduce<Record<string, unknown>>((accumulator, key) => {
+        accumulator[key] = normalizeStructuredExecutionValue(
+          (value as Record<string, unknown>)[key],
+        );
+        return accumulator;
+      }, {});
+  }
+
+  return value;
+}
+
+function stableStringifyExecutionValue(value: unknown): string {
+  if (Array.isArray(value)) {
+    return `[${value.map((item) => stableStringifyExecutionValue(item)).join(",")}]`;
+  }
+
+  if (value && typeof value === "object") {
+    return `{${Object.entries(value as Record<string, unknown>)
+      .sort(([leftKey], [rightKey]) => leftKey.localeCompare(rightKey))
+      .map(
+        ([key, nestedValue]) =>
+          `${JSON.stringify(key)}:${stableStringifyExecutionValue(nestedValue)}`,
+      )
+      .join(",")}}`;
+  }
+
+  return JSON.stringify(value);
+}
+
+function parseStructuredExecutionValue(value: string): unknown | null {
+  const normalized = normalizeExecutionOutput(value).trim();
+
+  if (normalized === "") {
+    return null;
+  }
+
+  try {
+    return JSON.parse(normalized);
+  } catch {
+    return null;
+  }
+}
+
+function looksLikeArrayStyleOutput(value: string) {
+  return /[\[\],]/.test(value);
+}
+
+function flattenStructuredExecutionTokens(value: unknown): string[] {
+  if (Array.isArray(value)) {
+    return value.flatMap((item) => flattenStructuredExecutionTokens(item));
+  }
+
+  if (value && typeof value === "object") {
+    return [
+      stableStringifyExecutionValue(normalizeStructuredExecutionValue(value)),
+    ];
+  }
+
+  return [String(value)];
+}
+
+function tokenizeLooseExecutionOutput(value: string): string[] {
+  return normalizeExecutionOutput(value)
+    .replace(/[\[\],]/g, " ")
+    .split(/\s+/)
+    .filter(Boolean);
+}
+
+function outputsAreEquivalent(actualOutput: string, expectedOutput: string) {
+  const normalizedActualOutput = normalizeExecutionOutput(actualOutput);
+  const normalizedExpectedOutput = normalizeExecutionOutput(expectedOutput);
+
+  if (normalizedActualOutput === normalizedExpectedOutput) {
+    return true;
+  }
+
+  const structuredActualOutput = parseStructuredExecutionValue(
+    normalizedActualOutput,
+  );
+  const structuredExpectedOutput = parseStructuredExecutionValue(
+    normalizedExpectedOutput,
+  );
+
+  if (
+    structuredActualOutput !== null &&
+    structuredExpectedOutput !== null &&
+    stableStringifyExecutionValue(
+      normalizeStructuredExecutionValue(structuredActualOutput),
+    ) ===
+      stableStringifyExecutionValue(
+        normalizeStructuredExecutionValue(structuredExpectedOutput),
+      )
+  ) {
+    return true;
+  }
+
+  if (
+    !looksLikeArrayStyleOutput(normalizedActualOutput) &&
+    !looksLikeArrayStyleOutput(normalizedExpectedOutput)
+  ) {
+    return false;
+  }
+
+  const comparableActualTokens =
+    structuredActualOutput !== null
+      ? flattenStructuredExecutionTokens(structuredActualOutput)
+      : tokenizeLooseExecutionOutput(normalizedActualOutput);
+  const comparableExpectedTokens =
+    structuredExpectedOutput !== null
+      ? flattenStructuredExecutionTokens(structuredExpectedOutput)
+      : tokenizeLooseExecutionOutput(normalizedExpectedOutput);
+
+  return (
+    comparableActualTokens.length === comparableExpectedTokens.length &&
+    comparableActualTokens.every(
+      (token, index) => token === comparableExpectedTokens[index],
+    )
+  );
 }
 
 function getHigherPriorityExecutionStatus(
@@ -275,16 +514,42 @@ async function executeStudentCodeAgainstVisibleCases(options: {
   language: StudentProgrammingLanguage;
   timeLimitMs: number;
   testCases: StudentVisibleTestCase[];
+  metadata?: {
+    userId: string;
+    examId: string;
+    questionId: string;
+    attemptId: string;
+  };
 }) {
   const tempDir = await mkdtemp(join(tmpdir(), "labproctor-run-"));
 
   try {
     const executionPlan = getExecutionPlan(options.language, tempDir);
     await writeFile(executionPlan.sourcePath, options.code, "utf8");
+    logApiEvent("exam.code.compile.started", {
+      userId: options.metadata?.userId ?? null,
+      examId: options.metadata?.examId ?? null,
+      questionId: options.metadata?.questionId ?? null,
+      attemptId: options.metadata?.attemptId ?? null,
+      language: options.language,
+      testCaseCount: options.testCases.length,
+    });
 
     const compileResult = await executeProcess(executionPlan.compileCommand, {
       cwd: tempDir,
       timeoutMs: COMPILATION_TIMEOUT_MS,
+    });
+
+    logApiEvent("exam.code.compile.completed", {
+      userId: options.metadata?.userId ?? null,
+      examId: options.metadata?.examId ?? null,
+      questionId: options.metadata?.questionId ?? null,
+      attemptId: options.metadata?.attemptId ?? null,
+      language: options.language,
+      timedOut: compileResult.timedOut,
+      exitCode: compileResult.exitCode ?? null,
+      durationMs: compileResult.durationMs,
+      success: !compileResult.timedOut && compileResult.exitCode === 0,
     });
 
     if (compileResult.timedOut || compileResult.exitCode !== 0) {
@@ -309,9 +574,12 @@ async function executeStudentCodeAgainstVisibleCases(options: {
     let stdErr: string | null = null;
 
     for (const testCase of options.testCases) {
+      const executionInput = formatExecutionInputForCompetitiveProgramming(
+        testCase.input,
+      );
       const runResult = await executeProcess(executionPlan.runCommand, {
         cwd: tempDir,
-        input: testCase.input,
+        input: executionInput,
         timeoutMs: Math.max(options.timeLimitMs, 250),
       });
 
@@ -325,7 +593,9 @@ async function executeStudentCodeAgainstVisibleCases(options: {
       const timedOut = runResult.timedOut;
       const runtimeFailed = !timedOut && runResult.exitCode !== 0;
       const passed =
-        !timedOut && !runtimeFailed && actualOutput === expectedOutput;
+        !timedOut &&
+        !runtimeFailed &&
+        outputsAreEquivalent(actualOutput, expectedOutput);
       const caseStatus: ExecutionSubmissionStatus = timedOut
         ? "TIME_LIMIT_EXCEEDED"
         : runtimeFailed
@@ -355,7 +625,7 @@ async function executeStudentCodeAgainstVisibleCases(options: {
       testCaseResults.push({
         testCaseId: testCase.id,
         passed,
-        input: testCase.input,
+        input: executionInput,
         expectedOutput: testCase.expectedOutput,
         actualOutput,
         executionTimeMs: runResult.durationMs,
@@ -579,6 +849,7 @@ app.post("/api/signup", async (_req: Request, res: Response) => {
         password: hashedPassword,
         name,
         role: "STUDENT",
+        facultyApproved: true,
         departmentId: departmentId ?? null,
         batchId: batchId ?? null,
         rollNumber: rollNumber ?? null,
@@ -600,6 +871,51 @@ app.post("/api/signup", async (_req: Request, res: Response) => {
   }
 });
 
+app.post("/api/signup/faculty", async (_req: Request, res: Response) => {
+  const result = FacultySignupSchema.safeParse(_req.body);
+  if (!result.success) {
+    return res.status(400).json({ errors: result.error.flatten().fieldErrors });
+  }
+
+  const { email, password, name } = result.data;
+
+  try {
+    const existingUser = await prisma.user.findUnique({ where: { email } });
+    if (existingUser) {
+      return res.status(400).json({ error: "User already exists" });
+    }
+
+    const hashedPassword = await bcrypt.hash(password, 12);
+    const user = await prisma.user.create({
+      data: {
+        email,
+        password: hashedPassword,
+        name,
+        role: "FACULTY",
+        facultyApproved: false,
+        departmentId: null,
+        batchId: null,
+        rollNumber: null,
+      },
+      omit: { password: true },
+    });
+
+    logApiEvent("auth.faculty_signup.created", {
+      userId: user.id,
+      email: user.email,
+    });
+
+    res.status(201).json(user);
+  } catch (error: any) {
+    if (error.code === "P2002") {
+      return res
+        .status(409)
+        .json({ error: "A user with that email already exists" });
+    }
+    res.status(500).json({ error: "Faculty signup failed" });
+  }
+});
+
 app.post("/api/signin", async (_req: Request, res: Response) => {
   const { email, password, expectedRole } = _req.body as {
     email?: string;
@@ -608,22 +924,47 @@ app.post("/api/signin", async (_req: Request, res: Response) => {
   };
 
   if (!email || !password) {
+    logApiEvent("auth.signin.validation_failed", {
+      reason: "missing_credentials",
+    });
     return res.status(400).json({ error: "email and password are required" });
   }
 
   if (expectedRole !== undefined && !isPortalRole(expectedRole)) {
+    logApiEvent("auth.signin.validation_failed", {
+      reason: "invalid_expected_role",
+    });
     return res.status(400).json({ error: "Invalid login role requested" });
   }
 
   try {
     const user = await prisma.user.findUnique({ where: { email } });
     if (!user) {
+      logApiEvent("auth.signin.denied", {
+        reason: "user_not_found",
+        email,
+      });
       return res.status(400).json({ error: "Invalid credentials" });
     }
 
     const isPasswordValid = await bcrypt.compare(password, user.password);
     if (!isPasswordValid) {
+      logApiEvent("auth.signin.denied", {
+        reason: "invalid_password",
+        userId: user.id,
+      });
       return res.status(400).json({ error: "Invalid credentials" });
+    }
+
+    if (user.role === "FACULTY" && !user.facultyApproved) {
+      logApiEvent("auth.signin.denied", {
+        reason: "faculty_pending_approval",
+        userId: user.id,
+      });
+      return res.status(403).json({
+        error: FACULTY_PENDING_MSG,
+        code: "FACULTY_PENDING_APPROVAL",
+      });
     }
 
     if (expectedRole && user.role !== expectedRole) {
@@ -633,6 +974,11 @@ app.post("/api/signin", async (_req: Request, res: Response) => {
           ? "Please use the admin login flow."
           : `Please use the ${actualPortal} login page.`;
 
+      logApiEvent("auth.signin.role_mismatch", {
+        userId: user.id,
+        expectedRole,
+        actualRole: user.role,
+      });
       return res.status(403).json({
         error: `This account does not have ${portalLabelByRole[expectedRole]} access. ${guidance}`,
       });
@@ -643,8 +989,14 @@ app.post("/api/signin", async (_req: Request, res: Response) => {
     });
 
     const { password: _, ...safeUser } = user;
+    logApiEvent("auth.signin.success", {
+      userId: user.id,
+      role: user.role,
+      expectedRole: isPortalRole(expectedRole) ? expectedRole : null,
+    });
     res.json({ token, user: safeUser });
   } catch (error) {
+    console.error("[api] auth.signin.failed", error);
     res.status(500).json({ error: "Signin failed" });
   }
 });
@@ -653,11 +1005,25 @@ app.get("/api/me", authMiddleware, async (_req: Request, res: Response) => {
   try {
     const user = await prisma.user.findUnique({ where: { id: _req.userId! } });
     if (!user) {
+      logApiEvent("auth.me.not_found", {
+        userId: _req.userId ?? null,
+      });
       return res.status(404).json({ error: "User not found" });
     }
+    if (user.role === "FACULTY" && !user.facultyApproved) {
+      return res.status(403).json({
+        error: FACULTY_PENDING_MSG,
+        code: "FACULTY_PENDING_APPROVAL",
+      });
+    }
     const { password: _, ...safeUser } = user;
+    logApiEvent("auth.me.success", {
+      userId: user.id,
+      role: user.role,
+    });
     res.json(safeUser);
   } catch (error) {
+    console.error("[api] auth.me.failed", error);
     res.status(500).json({ error: "Failed to get user" });
   }
 });
@@ -815,7 +1181,8 @@ app.patch(
         .json({ errors: result.error.flatten().fieldErrors });
     }
 
-    const { role, departmentId, batchId, rollNumber } = result.data;
+    const { role, departmentId, batchId, rollNumber, facultyApproved } =
+      result.data;
 
     // 3. Target user must exist
     const targetUser = await prisma.user.findUnique({
@@ -861,12 +1228,19 @@ app.patch(
       if (departmentId !== undefined) data.departmentId = departmentId ?? null;
       if (batchId !== undefined) data.batchId = batchId ?? null;
       if (rollNumber !== undefined) data.rollNumber = rollNumber ?? null;
+      if (facultyApproved !== undefined) data.facultyApproved = facultyApproved;
 
       // 7. If role is changing to FACULTY/ADMIN, clear student-only fields
       if (role === "FACULTY" || role === "ADMIN") {
         data.departmentId = null;
         data.batchId = null;
         data.rollNumber = null;
+      }
+
+      // Promoting a user to FACULTY via admin UI approves them by default unless
+      // facultyApproved is explicitly set in the same request.
+      if (role === "FACULTY" && facultyApproved === undefined) {
+        data.facultyApproved = true;
       }
 
       const updatedUser = await prisma.user.update({
@@ -902,14 +1276,17 @@ app.post(
   "/api/exams/:id/questions",
   authMiddleware,
   async (_req: Request, res: Response) => {
-    // 1. FACULTY only
     const faculty = await prisma.user.findUnique({
       where: { id: _req.userId! },
     });
-    if (!faculty || faculty.role !== "FACULTY") {
-      return res
-        .status(403)
-        .json({ error: "Only faculty members can add questions" });
+    if (
+      rejectUnapprovedFaculty(
+        res,
+        faculty,
+        "Only faculty members can add questions",
+      )
+    ) {
+      return;
     }
 
     // 2. Validate body
@@ -939,7 +1316,7 @@ app.post(
         return res.status(404).json({ error: "Exam not found" });
       }
 
-      if (exam.creatorId !== faculty.id) {
+      if (exam.creatorId !== faculty!.id) {
         return res
           .status(403)
           .json({ error: "You are not the creator of this exam" });
@@ -1008,10 +1385,14 @@ app.post(
         where: { id: _req.userId! },
       });
 
-      if (!creator || creator.role !== "FACULTY") {
-        return res
-          .status(403)
-          .json({ error: "Only faculty members can create exams" });
+      if (
+        rejectUnapprovedFaculty(
+          res,
+          creator,
+          "Only faculty members can create exams",
+        )
+      ) {
+        return;
       }
 
       const batch = await prisma.batch.findUnique({
@@ -1065,11 +1446,20 @@ app.get(
       });
 
       if (!user) {
+        logApiEvent("exam.list.user_not_found", {
+          userId: _req.userId ?? null,
+        });
         return res.status(404).json({ error: "User not found" });
       }
 
       // ── FACULTY: exams they created ──────────────────────────────────────
       if (user.role === "FACULTY") {
+        if (!user.facultyApproved) {
+          return res.status(403).json({
+            error: FACULTY_PENDING_MSG,
+            code: "FACULTY_PENDING_APPROVAL",
+          });
+        }
         const exams = await prisma.exam.findMany({
           where: {
             creatorId: user.id,
@@ -1102,6 +1492,11 @@ app.get(
           },
           orderBy: { startTime: "desc" },
         });
+        logApiEvent("exam.list.success", {
+          userId: user.id,
+          role: user.role,
+          examCount: exams.length,
+        });
         return res.json(exams);
       }
 
@@ -1114,6 +1509,11 @@ app.get(
             _count: { select: { questions: true, attempts: true } },
           },
           orderBy: { startTime: "desc" },
+        });
+        logApiEvent("exam.list.success", {
+          userId: user.id,
+          role: user.role,
+          examCount: exams.length,
         });
         return res.json(exams);
       }
@@ -1167,8 +1567,15 @@ app.get(
         orderBy: { startTime: "asc" },
       });
 
+      logApiEvent("exam.list.success", {
+        userId: user.id,
+        role: user.role,
+        examCount: exams.length,
+        eligibilityFilters: eligibilityFilter.length,
+      });
       return res.json(exams);
     } catch (error) {
+      console.error("[api] exam.list.failed", error);
       res.status(500).json({ error: "Failed to fetch exams" });
     }
   },
@@ -1187,6 +1594,11 @@ app.post(
       });
 
       if (!student || student.role !== "STUDENT") {
+        logApiEvent("exam.enter.denied", {
+          userId: _req.userId ?? null,
+          examId: _req.params.id ?? null,
+          reason: "non_student",
+        });
         return res
           .status(403)
           .json({ error: "Only students can enter an exam room" });
@@ -1213,6 +1625,11 @@ app.post(
       });
 
       if (!exam || exam.deletedAt !== null) {
+        logApiEvent("exam.enter.denied", {
+          userId: student.id,
+          examId: _req.params.id ?? null,
+          reason: "exam_not_found",
+        });
         return res.status(404).json({ error: "Exam not found" });
       }
 
@@ -1227,22 +1644,42 @@ app.post(
         );
 
       if (!isEligible) {
+        logApiEvent("exam.enter.denied", {
+          userId: student.id,
+          examId: exam.id,
+          reason: "ineligible",
+        });
         return res
           .status(403)
           .json({ error: "You are not eligible to enter this exam room" });
       }
 
       if (!exam.isActive) {
+        logApiEvent("exam.enter.denied", {
+          userId: student.id,
+          examId: exam.id,
+          reason: "not_active",
+        });
         return res
           .status(400)
           .json({ error: "This exam is not live right now" });
       }
 
       if (exam.startTime > now) {
+        logApiEvent("exam.enter.denied", {
+          userId: student.id,
+          examId: exam.id,
+          reason: "not_started",
+        });
         return res.status(400).json({ error: "This exam has not started yet" });
       }
 
       if (exam.endTime <= now) {
+        logApiEvent("exam.enter.denied", {
+          userId: student.id,
+          examId: exam.id,
+          reason: "ended",
+        });
         return res.status(400).json({ error: "This exam has already ended" });
       }
 
@@ -1255,12 +1692,24 @@ app.post(
       });
 
       if (latestAttempt?.status === "COMPLETED") {
+        logApiEvent("exam.enter.denied", {
+          userId: student.id,
+          examId: exam.id,
+          reason: "already_submitted",
+          attemptId: latestAttempt.id,
+        });
         return res
           .status(400)
           .json({ error: "You have already submitted this exam" });
       }
 
       if (latestAttempt?.status === "DISQUALIFIED") {
+        logApiEvent("exam.enter.denied", {
+          userId: student.id,
+          examId: exam.id,
+          reason: "disqualified",
+          attemptId: latestAttempt.id,
+        });
         return res
           .status(403)
           .json({ error: "Your exam attempt has been disqualified" });
@@ -1320,6 +1769,12 @@ app.post(
         },
       });
 
+      logApiEvent("exam.enter.success", {
+        userId: student.id,
+        examId: exam.id,
+        attemptId: attempt.id,
+        questionCount: questions.length,
+      });
       return res.json({
         serverTime: now.toISOString(),
         exam: {
@@ -1349,6 +1804,7 @@ app.post(
         },
       });
     } catch (error) {
+      console.error("[api] exam.enter.failed", error);
       return res.status(500).json({ error: "Failed to enter exam room" });
     }
   },
@@ -1471,6 +1927,124 @@ app.put(
 );
 
 app.post(
+  "/api/student/exams/:examId/violations",
+  authMiddleware,
+  async (_req: Request, res: Response) => {
+    try {
+      const { examId } = _req.params;
+      const { type, details } = _req.body;
+
+      if (!examId) {
+        return res.status(400).json({ error: "examId is required" });
+      }
+
+      const VALID_VIOLATION_TYPES = [
+        "TAB_SWITCH",
+        "FULLSCREEN_EXIT",
+        "COPY_PASTE",
+        "MULTIPLE_FACES",
+        "NO_FACE",
+        "OTHER",
+      ];
+
+      if (!type || !VALID_VIOLATION_TYPES.includes(type)) {
+        return res.status(400).json({ error: "Invalid violation type" });
+      }
+
+      const student = await prisma.user.findUnique({
+        where: { id: _req.userId! },
+      });
+      if (!student || student.role !== "STUDENT") {
+        return res
+          .status(403)
+          .json({ error: "Only students can report violations" });
+      }
+
+      const attempt = await prisma.examAttempt.findFirst({
+        where: {
+          userId: student.id,
+          examId,
+          status: "IN_PROGRESS",
+        },
+        orderBy: { retakeNumber: "desc" },
+      });
+
+      if (!attempt) {
+        return res
+          .status(404)
+          .json({ error: "No active IN_PROGRESS attempt found" });
+      }
+
+      const twoSecondsAgo = new Date(Date.now() - 2000);
+      const recentLog = await prisma.proctoringLog.findFirst({
+        where: {
+          attemptId: attempt.id,
+          violationType: type as any,
+          timestamp: { gte: twoSecondsAgo },
+        },
+      });
+
+      if (recentLog) {
+        return res.status(429).json({
+          error: "Rate limit: Duplicate violation type within 2 seconds",
+        });
+      }
+
+      const log = await prisma.proctoringLog.create({
+        data: {
+          attemptId: attempt.id,
+          violationType: type as any,
+          details: details ? String(details).slice(0, 500) : null,
+        },
+      });
+
+      let totalStrikes = 0;
+      let isDisqualified = false;
+
+      if (type === "TAB_SWITCH" || type === "FULLSCREEN_EXIT") {
+        totalStrikes = await prisma.proctoringLog.count({
+          where: {
+            attemptId: attempt.id,
+            violationType: {
+              in: ["TAB_SWITCH", "FULLSCREEN_EXIT"],
+            },
+          },
+        });
+
+        if (totalStrikes >= 3) {
+          await prisma.examAttempt.update({
+            where: { id: attempt.id },
+            data: {
+              status: "DISQUALIFIED",
+              completedAt: new Date(),
+            },
+          });
+          isDisqualified = true;
+        }
+      }
+
+      logApiEvent("exam.violation.recorded", {
+        userId: student.id,
+        examId,
+        attemptId: attempt.id,
+        type,
+        totalStrikes,
+      });
+
+      return res.json({
+        id: log.id,
+        timestamp: log.timestamp,
+        totalStrikes,
+        isDisqualified,
+      });
+    } catch (error) {
+      console.error("[api] exam.violation.failed", error);
+      return res.status(500).json({ error: "Failed to record violation" });
+    }
+  },
+);
+
+app.post(
   "/api/student/exams/:examId/questions/:questionId/run",
   authMiddleware,
   async (_req: Request, res: Response) => {
@@ -1583,6 +2157,12 @@ app.post(
         language,
         timeLimitMs: question.timeLimitMs,
         testCases: question.testCases,
+        metadata: {
+          userId: student.id,
+          examId,
+          questionId,
+          attemptId: attempt.id,
+        },
       });
 
       const submission = await upsertStudentSubmissionRecord({
@@ -1602,6 +2182,18 @@ app.post(
         testCaseResults: executionResult.storedTestCaseResults,
       });
 
+      logApiEvent("exam.code.run.completed", {
+        userId: student.id,
+        examId,
+        questionId,
+        attemptId: attempt.id,
+        submissionId: submission.id,
+        language,
+        status: executionResult.status,
+        passedCount: executionResult.passedCount,
+        totalCount: executionResult.totalCount,
+      });
+
       return res.json({
         submissionId: submission.id,
         status: executionResult.status,
@@ -1615,6 +2207,359 @@ app.post(
       });
     } catch (error) {
       return res.status(500).json({ error: "Failed to run code" });
+    }
+  },
+);
+
+app.post(
+  "/api/student/exams/:examId/submit",
+  authMiddleware,
+  async (_req: Request, res: Response) => {
+    try {
+      const { examId } = _req.params;
+      if (!examId) {
+        return res.status(400).json({ error: "examId is required" });
+      }
+
+      const now = new Date();
+      await deactivateExpiredExams(now);
+
+      const student = await prisma.user.findUnique({
+        where: { id: _req.userId! },
+      });
+      if (!student || student.role !== "STUDENT") {
+        return res
+          .status(403)
+          .json({ error: "Only students can submit an exam" });
+      }
+
+      const exam = await prisma.exam.findFirst({
+        where: { id: examId, deletedAt: null },
+        select: {
+          id: true,
+          startTime: true,
+          endTime: true,
+          isActive: true,
+        },
+      });
+
+      if (!exam) {
+        return res.status(404).json({ error: "Exam not found" });
+      }
+
+      const attempt = await prisma.examAttempt.findFirst({
+        where: { userId: student.id, examId },
+        orderBy: { retakeNumber: "desc" },
+      });
+
+      if (!attempt) {
+        return res.status(400).json({ error: "No attempt found for this exam" });
+      }
+
+      if (attempt.status === "DISQUALIFIED") {
+        return res
+          .status(403)
+          .json({ error: "This attempt has been disqualified" });
+      }
+
+      if (attempt.status === "COMPLETED") {
+        return res.status(400).json({
+          error: "This exam has already been submitted",
+          score: attempt.score,
+        });
+      }
+
+      if (attempt.status !== "IN_PROGRESS") {
+        return res
+          .status(400)
+          .json({ error: "Exam must be in progress to submit" });
+      }
+
+      const questions = await prisma.question.findMany({
+        where: { examId, deletedAt: null },
+        orderBy: { orderIndex: "asc" },
+        select: {
+          id: true,
+          marks: true,
+          timeLimitMs: true,
+        },
+      });
+
+      const maxTotalMarks = questions.reduce((s, q) => s + q.marks, 0);
+      let totalScore = 0;
+      const breakdown: Array<{
+        questionId: string;
+        marksEarned: number;
+        maxMarks: number;
+        status: ExecutionSubmissionStatus | "PENDING";
+        passedCount: number;
+        totalCount: number;
+      }> = [];
+
+      for (const question of questions) {
+        const latestSubmission = await prisma.submission.findFirst({
+          where: {
+            attemptId: attempt.id,
+            questionId: question.id,
+            userId: student.id,
+          },
+          orderBy: { submittedAt: "desc" },
+        });
+
+        const code = latestSubmission?.code ?? "";
+        const language = toStudentProgrammingLanguage(
+          latestSubmission?.language,
+        );
+
+        const testCases = await prisma.testCase.findMany({
+          where: { questionId: question.id },
+          orderBy: { id: "asc" },
+          select: {
+            id: true,
+            input: true,
+            expectedOutput: true,
+            isHidden: true,
+            weight: true,
+          },
+        });
+
+        const weightedForScore = testCases.map((tc) => ({
+          id: tc.id,
+          weight: tc.weight,
+        }));
+
+        if (testCases.length === 0) {
+          await upsertStudentSubmissionRecord({
+            attemptId: attempt.id,
+            userId: student.id,
+            examId,
+            questionId: question.id,
+            code,
+            language,
+            submittedAt: now,
+            status: "PENDING",
+            executionTimeMs: null,
+            memoryUsedKb: null,
+            passedCount: 0,
+            totalCount: 0,
+            stdErr: null,
+            testCaseResults: [],
+          });
+          breakdown.push({
+            questionId: question.id,
+            marksEarned: 0,
+            maxMarks: question.marks,
+            status: "PENDING",
+            passedCount: 0,
+            totalCount: 0,
+          });
+          continue;
+        }
+
+        const visibleCases: StudentVisibleTestCase[] = testCases.map((tc) => ({
+          id: tc.id,
+          input: tc.input,
+          expectedOutput: tc.expectedOutput,
+          isHidden: tc.isHidden,
+        }));
+
+        const executionResult = await executeStudentCodeAgainstVisibleCases({
+          code,
+          language,
+          timeLimitMs: question.timeLimitMs,
+          testCases: visibleCases,
+          metadata: {
+            userId: student.id,
+            examId,
+            questionId: question.id,
+            attemptId: attempt.id,
+          },
+        });
+
+        const marksEarned = calculateWeightedQuestionScore(
+          question.marks,
+          weightedForScore,
+          executionResult.storedTestCaseResults,
+          executionResult.status,
+        );
+        totalScore += marksEarned;
+
+        await upsertStudentSubmissionRecord({
+          attemptId: attempt.id,
+          userId: student.id,
+          examId,
+          questionId: question.id,
+          code,
+          language,
+          submittedAt: now,
+          status: executionResult.status,
+          executionTimeMs: executionResult.executionTimeMs,
+          memoryUsedKb: executionResult.memoryUsedKb,
+          passedCount: executionResult.passedCount,
+          totalCount: executionResult.totalCount,
+          stdErr: executionResult.stdErr,
+          testCaseResults: executionResult.storedTestCaseResults,
+        });
+
+        breakdown.push({
+          questionId: question.id,
+          marksEarned: Math.round(marksEarned * 100) / 100,
+          maxMarks: question.marks,
+          status: executionResult.status,
+          passedCount: executionResult.passedCount,
+          totalCount: executionResult.totalCount,
+        });
+      }
+
+      const roundedTotal = Math.round(totalScore * 100) / 100;
+
+      await prisma.examAttempt.update({
+        where: { id: attempt.id },
+        data: {
+          status: "COMPLETED",
+          score: roundedTotal,
+          completedAt: now,
+          gradedAt: now,
+        },
+      });
+
+      logApiEvent("exam.submit.success", {
+        userId: student.id,
+        examId,
+        attemptId: attempt.id,
+        totalScore: roundedTotal,
+        questionCount: questions.length,
+      });
+
+      return res.json({
+        totalScore: roundedTotal,
+        maxTotalMarks,
+        breakdown,
+      });
+    } catch (error) {
+      console.error("[api] exam.submit.failed", error);
+      return res.status(500).json({ error: "Failed to submit exam" });
+    }
+  },
+);
+
+app.get(
+  "/api/faculty/exams/:examId/results",
+  authMiddleware,
+  async (_req: Request, res: Response) => {
+    try {
+      const { examId } = _req.params;
+      if (!examId) {
+        return res.status(400).json({ error: "examId is required" });
+      }
+
+      const faculty = await prisma.user.findUnique({
+        where: { id: _req.userId! },
+      });
+      if (
+        rejectUnapprovedFaculty(
+          res,
+          faculty,
+          "Only faculty members can view exam results",
+        )
+      ) {
+        return;
+      }
+
+      const exam = await prisma.exam.findFirst({
+        where: {
+          id: examId,
+          deletedAt: null,
+          creatorId: faculty!.id,
+        },
+        select: {
+          id: true,
+          title: true,
+          startTime: true,
+          endTime: true,
+          questions: {
+            where: { deletedAt: null },
+            select: { marks: true },
+          },
+        },
+      });
+
+      if (!exam) {
+        return res.status(404).json({ error: "Exam not found" });
+      }
+
+      const totalMarks = exam.questions.reduce((s, q) => s + q.marks, 0);
+
+      const attempts = await prisma.examAttempt.findMany({
+        where: {
+          examId,
+          status: "COMPLETED",
+        },
+        orderBy: [{ score: "desc" }, { completedAt: "asc" }],
+        include: {
+          user: {
+            select: {
+              id: true,
+              name: true,
+              rollNumber: true,
+              email: true,
+            },
+          },
+        },
+      });
+
+      const rows = attempts.map((a, index) => {
+        const started = a.startedAt?.getTime() ?? null;
+        const completed = a.completedAt?.getTime() ?? null;
+        const durationMs =
+          started !== null && completed !== null
+            ? Math.max(0, completed - started)
+            : null;
+
+        return {
+          rank: index + 1,
+          attemptId: a.id,
+          userId: a.user.id,
+          name: a.user.name,
+          rollNumber: a.user.rollNumber,
+          email: a.user.email,
+          score: a.score,
+          startedAt: a.startedAt,
+          completedAt: a.completedAt,
+          durationMs,
+        };
+      });
+
+      const scores = attempts
+        .map((a) => a.score)
+        .filter((s): s is number => s !== null && s !== undefined);
+      const averageScore =
+        scores.length > 0
+          ? Math.round(
+              (scores.reduce((acc, s) => acc + s, 0) / scores.length) * 100,
+            ) / 100
+          : null;
+      const highestScore =
+        scores.length > 0 ? Math.max(...scores) : null;
+
+      return res.json({
+        exam: {
+          id: exam.id,
+          title: exam.title,
+          startTime: exam.startTime,
+          endTime: exam.endTime,
+          totalMarks,
+        },
+        summary: {
+          participantCount: attempts.length,
+          averageScore,
+          highestScore,
+        },
+        attempts: rows,
+      });
+    } catch (error) {
+      console.error("[api] faculty.exam.results.failed", error);
+      return res.status(500).json({ error: "Failed to fetch exam results" });
     }
   },
 );
@@ -1653,10 +2598,14 @@ app.patch(
     const faculty = await prisma.user.findUnique({
       where: { id: _req.userId! },
     });
-    if (!faculty || faculty.role !== "FACULTY") {
-      return res
-        .status(403)
-        .json({ error: "Only faculty members can update exams" });
+    if (
+      rejectUnapprovedFaculty(
+        res,
+        faculty,
+        "Only faculty members can update exams",
+      )
+    ) {
+      return;
     }
 
     const result = UpdateExamSchema.safeParse(_req.body);
@@ -1674,7 +2623,7 @@ app.patch(
         return res.status(404).json({ error: "Exam not found" });
       }
 
-      if (exam.creatorId !== faculty.id) {
+      if (exam.creatorId !== faculty!.id) {
         return res
           .status(403)
           .json({ error: "You are not the creator of this exam" });
@@ -1764,10 +2713,14 @@ app.delete(
     const faculty = await prisma.user.findUnique({
       where: { id: _req.userId! },
     });
-    if (!faculty || faculty.role !== "FACULTY") {
-      return res
-        .status(403)
-        .json({ error: "Only faculty members can delete exams" });
+    if (
+      rejectUnapprovedFaculty(
+        res,
+        faculty,
+        "Only faculty members can delete exams",
+      )
+    ) {
+      return;
     }
 
     try {
@@ -1779,7 +2732,7 @@ app.delete(
         return res.status(404).json({ error: "Exam not found" });
       }
 
-      if (exam.creatorId !== faculty.id) {
+      if (exam.creatorId !== faculty!.id) {
         return res
           .status(403)
           .json({ error: "You are not the creator of this exam" });
@@ -1821,14 +2774,17 @@ app.get(
   "/api/exams/:id/questions",
   authMiddleware,
   async (_req: Request, res: Response) => {
-    // FACULTY only
     const faculty = await prisma.user.findUnique({
       where: { id: _req.userId! },
     });
-    if (!faculty || faculty.role !== "FACULTY") {
-      return res
-        .status(403)
-        .json({ error: "Only faculty members can view questions" });
+    if (
+      rejectUnapprovedFaculty(
+        res,
+        faculty,
+        "Only faculty members can view questions",
+      )
+    ) {
+      return;
     }
 
     try {
@@ -1840,7 +2796,7 @@ app.get(
         return res.status(404).json({ error: "Exam not found" });
       }
 
-      if (exam.creatorId !== faculty.id) {
+      if (exam.creatorId !== faculty!.id) {
         return res
           .status(403)
           .json({ error: "You are not the creator of this exam" });
@@ -1871,10 +2827,14 @@ app.patch(
     const faculty = await prisma.user.findUnique({
       where: { id: _req.userId! },
     });
-    if (!faculty || faculty.role !== "FACULTY") {
-      return res
-        .status(403)
-        .json({ error: "Only faculty members can update questions" });
+    if (
+      rejectUnapprovedFaculty(
+        res,
+        faculty,
+        "Only faculty members can update questions",
+      )
+    ) {
+      return;
     }
 
     const result = UpdateQuestionSchema.safeParse(_req.body);
@@ -1894,7 +2854,7 @@ app.patch(
         return res.status(404).json({ error: "Question not found" });
       }
 
-      if (question.exam.creatorId !== faculty.id) {
+      if (question.exam.creatorId !== faculty!.id) {
         return res
           .status(403)
           .json({ error: "You are not the creator of this exam" });
@@ -1943,10 +2903,14 @@ app.delete(
     const faculty = await prisma.user.findUnique({
       where: { id: _req.userId! },
     });
-    if (!faculty || faculty.role !== "FACULTY") {
-      return res
-        .status(403)
-        .json({ error: "Only faculty members can delete questions" });
+    if (
+      rejectUnapprovedFaculty(
+        res,
+        faculty,
+        "Only faculty members can delete questions",
+      )
+    ) {
+      return;
     }
 
     try {
@@ -1959,7 +2923,7 @@ app.delete(
         return res.status(404).json({ error: "Question not found" });
       }
 
-      if (question.exam.creatorId !== faculty.id) {
+      if (question.exam.creatorId !== faculty!.id) {
         return res
           .status(403)
           .json({ error: "You are not the creator of this exam" });
@@ -1990,10 +2954,14 @@ app.post(
     const faculty = await prisma.user.findUnique({
       where: { id: _req.userId! },
     });
-    if (!faculty || faculty.role !== "FACULTY") {
-      return res
-        .status(403)
-        .json({ error: "Only faculty members can add test cases" });
+    if (
+      rejectUnapprovedFaculty(
+        res,
+        faculty,
+        "Only faculty members can add test cases",
+      )
+    ) {
+      return;
     }
 
     const result = TestCaseSchema.safeParse(_req.body);
@@ -2015,7 +2983,7 @@ app.post(
         return res.status(404).json({ error: "Question not found" });
       }
 
-      if (question.exam.creatorId !== faculty.id) {
+      if (question.exam.creatorId !== faculty!.id) {
         return res
           .status(403)
           .json({ error: "You are not the creator of this exam" });
@@ -2051,10 +3019,14 @@ app.patch(
     const faculty = await prisma.user.findUnique({
       where: { id: _req.userId! },
     });
-    if (!faculty || faculty.role !== "FACULTY") {
-      return res
-        .status(403)
-        .json({ error: "Only faculty members can update test cases" });
+    if (
+      rejectUnapprovedFaculty(
+        res,
+        faculty,
+        "Only faculty members can update test cases",
+      )
+    ) {
+      return;
     }
 
     const result = UpdateTestCaseSchema.safeParse(_req.body);
@@ -2079,7 +3051,7 @@ app.patch(
         return res.status(404).json({ error: "Question has been deleted" });
       }
 
-      if (testCase.question.exam.creatorId !== faculty.id) {
+      if (testCase.question.exam.creatorId !== faculty!.id) {
         return res
           .status(403)
           .json({ error: "You are not the creator of this exam" });
@@ -2118,10 +3090,14 @@ app.delete(
     const faculty = await prisma.user.findUnique({
       where: { id: _req.userId! },
     });
-    if (!faculty || faculty.role !== "FACULTY") {
-      return res
-        .status(403)
-        .json({ error: "Only faculty members can delete test cases" });
+    if (
+      rejectUnapprovedFaculty(
+        res,
+        faculty,
+        "Only faculty members can delete test cases",
+      )
+    ) {
+      return;
     }
 
     try {
@@ -2139,7 +3115,7 @@ app.delete(
         return res.status(404).json({ error: "Question has been deleted" });
       }
 
-      if (testCase.question.exam.creatorId !== faculty.id) {
+      if (testCase.question.exam.creatorId !== faculty!.id) {
         return res
           .status(403)
           .json({ error: "You are not the creator of this exam" });
