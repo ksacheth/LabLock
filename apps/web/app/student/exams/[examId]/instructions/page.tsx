@@ -82,7 +82,6 @@ export default function StudentExamInstructionsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [exam, setExam] = useState<Exam | null>(null);
-  const [agreed, setAgreed] = useState(false);
   const [currentTimeMs, setCurrentTimeMs] = useState(() => Date.now());
 
   useEffect(() => {
@@ -177,8 +176,8 @@ export default function StudentExamInstructionsPage() {
   const liveNow = exam ? isExamLive(exam, currentTimeMs) : false;
   const canEnter = Boolean(exam) && liveNow && !isLocked;
 
-  const handleAgreeAndEnter = () => {
-    if (!examId || !canEnter || !agreed) return;
+  const handleEnter = () => {
+    if (!examId || !canEnter) return;
     markExamEntryConsent(examId);
     router.push(buildStudentExamRoomPath(examId));
   };
@@ -224,49 +223,7 @@ export default function StudentExamInstructionsPage() {
                 </p>
               </div>
 
-              <div className="space-y-8 px-8 py-8">
-                <section>
-                  <h2 className="text-sm font-black uppercase tracking-[0.2em] text-slate-500">
-                    Basic Instructions
-                  </h2>
-                  <div className="mt-4 grid gap-4 md:grid-cols-2">
-                    {[
-                      "Keep your internet, camera, microphone, and laptop power stable for the full exam window.",
-                      "Use only the language you select in the editor. Save your draft often before moving between questions.",
-                      "Do not refresh, close the tab, or switch away from the exam unless your invigilator allows it.",
-                      "Access closes automatically at the scheduled end time, even if you still have unsaved code.",
-                    ].map((instruction) => (
-                      <div
-                        key={instruction}
-                        className="rounded-2xl border border-slate-200 bg-slate-50 px-5 py-4 text-sm leading-7 text-slate-700"
-                      >
-                        {instruction}
-                      </div>
-                    ))}
-                  </div>
-                </section>
 
-                <section>
-                  <h2 className="text-sm font-black uppercase tracking-[0.2em] text-slate-500">
-                    Before You Continue
-                  </h2>
-                  <div className="mt-4 rounded-3xl border border-primary/10 bg-primary/[0.03] p-6">
-                    <label className="flex cursor-pointer items-start gap-4">
-                      <input
-                        type="checkbox"
-                        checked={agreed}
-                        onChange={(event) => setAgreed(event.target.checked)}
-                        className="mt-1 size-5 rounded border-slate-300 text-primary focus:ring-primary"
-                      />
-                      <span className="text-sm leading-7 text-slate-700">
-                        I have read the instructions, I understand that the exam
-                        room will close automatically at the scheduled time, and
-                        I am ready to enter now.
-                      </span>
-                    </label>
-                  </div>
-                </section>
-              </div>
             </section>
 
             <aside className="space-y-6">
@@ -326,13 +283,13 @@ export default function StudentExamInstructionsPage() {
 
                 <div className="mt-6 flex flex-col gap-3">
                   <button
-                    onClick={handleAgreeAndEnter}
-                    disabled={!agreed || !canEnter}
+                    onClick={handleEnter}
+                    disabled={!canEnter}
                     className="rounded-xl bg-primary px-5 py-3 text-sm font-bold text-white transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:bg-slate-300"
                   >
                     {latestAttempt?.status === "IN_PROGRESS"
-                      ? "I Agree, Resume Exam Room"
-                      : "I Agree, Enter Exam Room"}
+                      ? "Resume Exam Room"
+                      : "Enter Exam Room"}
                   </button>
                   <button
                     onClick={() => router.push("/student/dashboard")}

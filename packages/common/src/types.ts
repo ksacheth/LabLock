@@ -1,5 +1,120 @@
 import { z } from "zod";
 
+function normalizeTestCaseLineEndings(value: string) {
+  return value.replace(/\r\n/g, "\n");
+}
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function serializeInlineTestCaseValue(value: unknown): string | null {
+  if (typeof value === "string") {
+    return normalizeTestCaseLineEndings(value);
+  }
+
+  if (
+    typeof value === "number" ||
+    typeof value === "boolean" ||
+    typeof value === "bigint"
+  ) {
+    return String(value);
+  }
+
+  if (value === null) {
+    return "null";
+  }
+
+  if (Array.isArray(value) || isPlainObject(value)) {
+    return JSON.stringify(value);
+  }
+
+  return null;
+}
+
+function serializeTestCaseText(value: unknown): string | null {
+  if (typeof value === "string") {
+    return normalizeTestCaseLineEndings(value);
+  }
+
+  if (
+    typeof value === "number" ||
+    typeof value === "boolean" ||
+    typeof value === "bigint"
+  ) {
+    return String(value);
+  }
+
+  if (Array.isArray(value)) {
+    return normalizeTestCaseLineEndings(
+      value
+        .map((item) => {
+          if (Array.isArray(item)) {
+            return item
+              .map((nestedItem) => serializeInlineTestCaseValue(nestedItem))
+              .filter((nestedItem): nestedItem is string => nestedItem !== null)
+              .join(" ");
+          }
+
+          return serializeInlineTestCaseValue(item);
+        })
+        .filter((item): item is string => item !== null)
+        .join("\n"),
+    );
+  }
+
+  if (isPlainObject(value)) {
+    return normalizeTestCaseLineEndings(JSON.stringify(value));
+  }
+
+  return null;
+}
+
+function createRequiredTestCaseTextSchema(message: string) {
+  return z
+    .unknown()
+    .transform((value, ctx): string => {
+      const normalized = serializeTestCaseText(value);
+
+      if (normalized === null) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message,
+        });
+        return z.NEVER;
+      }
+
+      return normalized;
+    })
+    .refine((value) => value.trim().length > 0, { message });
+}
+
+function createOptionalTestCaseTextSchema(message: string) {
+  return z
+    .unknown()
+    .optional()
+    .transform((value, ctx): string | undefined => {
+      if (value === undefined) {
+        return undefined;
+      }
+
+      const normalized = serializeTestCaseText(value);
+
+      if (normalized === null) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message,
+        });
+        return z.NEVER;
+      }
+
+      return normalized;
+    })
+    .refine((value) => value === undefined || value.trim().length > 0, {
+      message,
+    });
+}
+
 export const AdminUpdateUserSchema = z
   .object({
     role: z.enum(["STUDENT", "FACULTY", "ADMIN"]).optional(),
@@ -13,6 +128,8 @@ export const AdminUpdateUserSchema = z
       .min(1, "rollNumber cannot be empty")
       .max(20, "rollNumber must be at most 20 characters")
       .nullish(),
+    /** Approve pending faculty (self-signup) or revoke; only meaningful when role is FACULTY. */
+    facultyApproved: z.boolean().optional(),
   })
   .refine(
     (data) => {
@@ -198,8 +315,10 @@ export const UpdateQuestionSchema = z.object({
 export type UpdateQuestionInput = z.infer<typeof UpdateQuestionSchema>;
 
 export const TestCaseSchema = z.object({
-  input: z.string().min(1, "Input is required"),
-  expectedOutput: z.string().min(1, "Expected output is required"),
+  input: createRequiredTestCaseTextSchema("Input is required"),
+  expectedOutput: createRequiredTestCaseTextSchema(
+    "Expected output is required",
+  ),
   isHidden: z.boolean().default(true),
   weight: z
     .number({ message: "weight must be a number" })
@@ -210,11 +329,10 @@ export const TestCaseSchema = z.object({
 export type TestCaseInput = z.infer<typeof TestCaseSchema>;
 
 export const UpdateTestCaseSchema = z.object({
-  input: z.string().min(1, "Input cannot be empty").optional(),
-  expectedOutput: z
-    .string()
-    .min(1, "Expected output cannot be empty")
-    .optional(),
+  input: createOptionalTestCaseTextSchema("Input cannot be empty"),
+  expectedOutput: createOptionalTestCaseTextSchema(
+    "Expected output cannot be empty",
+  ),
   isHidden: z.boolean().optional(),
   weight: z.number().positive("weight must be positive").optional(),
 });
@@ -241,4 +359,20 @@ export const UserSchema = z.object({
     .min(1, "Roll number cannot be empty")
     .max(20, "Roll number must be at most 20 characters")
     .optional(),
+});
+
+/** Self-service faculty registration; requires admin approval before login works as faculty. */
+export const FacultySignupSchema = z.object({
+  email: z
+    .string()
+    .email("Invalid email address")
+    .endsWith("@nitk.edu.in", "Email must be a NITK email"),
+  name: z
+    .string()
+    .min(3, "Name must be at least 3 characters")
+    .max(50, "Name must be at most 50 characters"),
+  password: z
+    .string()
+    .min(8, "Password must be at least 8 characters")
+    .max(50, "Password must be at most 50 characters"),
 });

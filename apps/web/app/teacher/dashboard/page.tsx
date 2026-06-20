@@ -213,9 +213,18 @@ export default function TeacherDashboard() {
         applyDashboardData(data);
       } catch (err) {
         console.error("Failed to fetch dashboard data", err);
-        if (isActive) {
-          setError("Failed to load dashboard data.");
+        if (!isActive) return;
+        const ax = err as AxiosError<{ code?: string; error?: string }>;
+        if (
+          ax.response?.status === 403 &&
+          ax.response?.data?.code === "FACULTY_PENDING_APPROVAL"
+        ) {
+          localStorage.removeItem("token");
+          localStorage.removeItem("user");
+          router.replace("/auth/teacher/login?pending=1");
+          return;
         }
+        setError("Failed to load dashboard data.");
       } finally {
         if (isActive) {
           setLoading(false);

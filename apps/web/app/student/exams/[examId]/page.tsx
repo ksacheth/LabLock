@@ -635,6 +635,19 @@ interface RunCodeResult {
   testCaseResults: RunTestCaseResult[];
 }
 
+interface ExamSubmitResponse {
+  totalScore: number;
+  maxTotalMarks: number;
+  breakdown: Array<{
+    questionId: string;
+    marksEarned: number;
+    maxMarks: number;
+    status: string;
+    passedCount: number;
+    totalCount: number;
+  }>;
+}
+
 function createDraftState(question: RoomQuestion): QuestionDraftState {
   const language = question.draft?.language ?? "CPP";
 
@@ -669,6 +682,41 @@ export default function StudentExamRoomPage() {
   const editorHighlightRef = useRef<HTMLPreElement | null>(null);
   const editorLineNumberRef = useRef<HTMLPreElement | null>(null);
   const editorTextareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const examContainerRef = useRef<HTMLDivElement | null>(null);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [showFullscreenPrompt, setShowFullscreenPrompt] = useState(false);
+  const [integrityWarning, setIntegrityWarning] = useState<string | null>(null);
+  const [submittingExam, setSubmittingExam] = useState(false);
+  const [submitSummary, setSubmitSummary] = useState<{
+    totalScore: number;
+    maxTotalMarks: number;
+  } | null>(null);
+
+  const recordViolation = async (type: string, details?: string) => {
+    if (!examId || roomEnded) return;
+    const token = getToken();
+    if (!token) return;
+
+    try {
+      const { data } = await axios.post(
+        `${API_URL}/api/student/exams/${examId}/violations`,
+        { type, details },
+        { headers: { Authorization: `Bearer ${token}` } },
+      );
+
+      if (data.isDisqualified) {
+        router.replace(`/student/exams/${examId}/instructions`);
+      } else if (type === "TAB_SWITCH" || type === "FULLSCREEN_EXIT") {
+        if (data.totalStrikes !== undefined && data.totalStrikes > 0) {
+          setIntegrityWarning(
+            `Strike ${data.totalStrikes}/3: You have switched tabs or exited fullscreen. 3 strikes will result in an immediate ban.`,
+          );
+        }
+      }
+    } catch {
+      // Intentionally ignoring errors here
+    }
+  };
 
   useEffect(() => {
     if (!examId) {
@@ -723,6 +771,15 @@ export default function StudentExamRoomPage() {
         }
 
         setRoomData(roomRes.data);
+        if (
+          roomRes.data.attempt.status === "IN_PROGRESS" &&
+          examContainerRef.current &&
+          !document.fullscreenElement
+        ) {
+          examContainerRef.current.requestFullscreen().catch(() => {
+            setShowFullscreenPrompt(true);
+          });
+        }
         const serverTimeMs = Date.parse(roomRes.data.serverTime);
         setCurrentTimeMs(
           Number.isNaN(serverTimeMs) ? Date.now() : serverTimeMs,
@@ -798,6 +855,75 @@ export default function StudentExamRoomPage() {
     (_, index) => index + 1,
   );
 
+  // Fullscreen, visibility, and focus anti-cheating effect
+  useEffect(() => {
+    if (!roomData || roomEnded) return;
+
+    let visibilityTimeout: NodeJS.Timeout;
+
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        visibilityTimeout = setTimeout(() => {
+          recordViolation(
+            "TAB_SWITCH",
+            "Document hidden (tab switch or minimized)",
+          );
+        }, 500);
+      } else {
+        clearTimeout(visibilityTimeout);
+      }
+    };
+
+    const handleBlur = () => {
+      visibilityTimeout = setTimeout(() => {
+        recordViolation("TAB_SWITCH", "Window lost focus");
+      }, 500);
+    };
+
+    const handleFocus = () => {
+      clearTimeout(visibilityTimeout);
+    };
+
+    const handleFullscreenChange = () => {
+      const isCurrentlyFullscreen = !!document.fullscreenElement;
+      setIsFullscreen(isCurrentlyFullscreen);
+      if (!isCurrentlyFullscreen) {
+        recordViolation("FULLSCREEN_EXIT", "Exited fullscreen mode");
+        setShowFullscreenPrompt(true);
+      } else {
+        setShowFullscreenPrompt(false);
+      }
+    };
+
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = "";
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    window.addEventListener("blur", handleBlur);
+    window.addEventListener("focus", handleFocus);
+    document.addEventListener("fullscreenchange", handleFullscreenChange);
+    window.addEventListener("beforeunload", handleBeforeUnload);
+
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      window.removeEventListener("blur", handleBlur);
+      window.removeEventListener("focus", handleFocus);
+      document.removeEventListener("fullscreenchange", handleFullscreenChange);
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+      clearTimeout(visibilityTimeout);
+    };
+  }, [roomData, roomEnded]);
+
+  // Warning toast auto-dismiss
+  useEffect(() => {
+    if (integrityWarning) {
+      const t = setTimeout(() => setIntegrityWarning(null), 5000);
+      return () => clearTimeout(t);
+    }
+  }, [integrityWarning]);
+
   useEffect(() => {
     setEditorNotice(null);
     setRunResult(null);
@@ -869,7 +995,24 @@ export default function StudentExamRoomPage() {
     }
   };
 
-  const handleEditorKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
+  const handleEditorKeyDown = (
+    event: React.KeyboardEvent<HTMLTextAreaElement>,
+  ) => {
+    const isMac = navigator.platform.toUpperCase().indexOf("MAC") >= 0;
+    const cmdOrCtrl = isMac ? event.metaKey : event.ctrlKey;
+
+    if (
+      cmdOrCtrl &&
+      (event.key.toLowerCase() === "c" ||
+        event.key.toLowerCase() === "v" ||
+        event.key.toLowerCase() === "x")
+    ) {
+      event.preventDefault();
+      recordViolation("COPY_PASTE", `Keyboard shortcut ${event.key} blocked`);
+      setIntegrityWarning("Copy/paste shortcuts are disabled during the exam.");
+      return;
+    }
+
     if (event.key !== "Tab" || !activeQuestion || !activeDraft || roomEnded) {
       return;
     }
@@ -907,7 +1050,8 @@ export default function StudentExamRoomPage() {
   };
 
   const runCode = async () => {
-    if (!examId || !activeQuestion || !activeDraft || roomEnded) return;
+    if (!examId || !activeQuestion || !activeDraft || roomEnded || submitSummary)
+      return;
 
     const token = getToken();
     if (!token) {
@@ -953,7 +1097,8 @@ export default function StudentExamRoomPage() {
   };
 
   const saveDraft = async () => {
-    if (!examId || !activeQuestion || !activeDraft || roomEnded) return;
+    if (!examId || !activeQuestion || !activeDraft || roomEnded || submitSummary)
+      return;
 
     const token = getToken();
     if (!token) {
@@ -1007,8 +1152,170 @@ export default function StudentExamRoomPage() {
     }
   };
 
+  const submitEntireExam = async () => {
+    if (!examId || !roomData || submittingExam || submitSummary) return;
+    if (
+      !window.confirm(
+        "Submit your entire exam? This cannot be undone. Every question will be graded against all test cases (including hidden).",
+      )
+    ) {
+      return;
+    }
+
+    const token = getToken();
+    if (!token) {
+      router.replace("/auth/student/login");
+      return;
+    }
+
+    setSubmittingExam(true);
+    setEditorNotice(null);
+    try {
+      if (!roomEnded) {
+        for (const q of roomData.exam.questions) {
+          const d = draftsByQuestionId[q.id];
+          if (!d) continue;
+          const { data } = await axios.put<{ submittedAt: string }>(
+            `${API_URL}/api/student/exams/${examId}/questions/${q.id}/draft`,
+            { code: d.code, language: d.language },
+            { headers: { Authorization: `Bearer ${token}` } },
+          );
+          updateDraftState(q.id, (c) => ({
+            ...c,
+            lastSavedAt: data.submittedAt,
+            saveState: "saved",
+          }));
+        }
+      }
+
+      const { data } = await axios.post<ExamSubmitResponse>(
+        `${API_URL}/api/student/exams/${examId}/submit`,
+        {},
+        { headers: { Authorization: `Bearer ${token}` } },
+      );
+      setSubmitSummary({
+        totalScore: data.totalScore,
+        maxTotalMarks: data.maxTotalMarks,
+      });
+    } catch (err) {
+      const message =
+        err instanceof AxiosError
+          ? String(
+              (err.response?.data as { error?: string })?.error ??
+                "Failed to submit exam.",
+            )
+          : "Failed to submit exam.";
+      setEditorNotice({ type: "error", message });
+    } finally {
+      setSubmittingExam(false);
+    }
+  };
+
+  // Auto-Save Effect
+  useEffect(() => {
+    if (
+      !roomData ||
+      roomEnded ||
+      !activeQuestion ||
+      !activeDraft ||
+      submitSummary ||
+      submittingExam
+    )
+      return;
+
+    const interval = setInterval(() => {
+      const isDirty =
+        activeDraft.saveState === "idle" &&
+        activeDraft.code !== starterCodeByLanguage[activeDraft.language];
+
+      if (isDirty) {
+        saveDraft();
+      }
+    }, 4000);
+
+    return () => clearInterval(interval);
+  }, [roomData, roomEnded, activeQuestion, activeDraft]);
+
+  const handlePaste = (e: React.ClipboardEvent) => {
+    e.preventDefault();
+    recordViolation("COPY_PASTE", "Pasted text in editor");
+    setIntegrityWarning("Pasting code is not allowed.");
+  };
+
+  const handleCopyCut = (e: React.ClipboardEvent) => {
+    e.preventDefault();
+    recordViolation("COPY_PASTE", "Copied or cut text from editor");
+    setIntegrityWarning("Copying text is not allowed.");
+  };
+
   return (
-    <div className="flex h-[100dvh] flex-col bg-[#f8fafc] text-slate-900">
+    <div
+      ref={examContainerRef}
+      className="flex h-[100dvh] flex-col bg-[#f8fafc] text-slate-900"
+    >
+      {/* Fullscreen Prompt Overlay */}
+      {showFullscreenPrompt && roomData && !roomEnded ? (
+        <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-slate-900 p-6 text-center text-white">
+          <span className="material-symbols-outlined mb-4 text-7xl text-red-500">
+            fullscreen
+          </span>
+          <h1 className="mb-2 text-3xl font-black text-slate-100">
+            Fullscreen Required
+          </h1>
+          <p className="mb-8 max-w-md text-slate-400">
+            This exam requires you to remain in fullscreen mode. Leaving
+            fullscreen has been recorded as a violation. Please re-enter
+            fullscreen to continue.
+          </p>
+          <button
+            onClick={() => {
+              if (examContainerRef.current) {
+                examContainerRef.current.requestFullscreen().catch(() => {});
+              }
+            }}
+            className="rounded-xl bg-primary px-8 py-4 font-bold text-white transition hover:bg-primary/90"
+          >
+            Enter Fullscreen
+          </button>
+        </div>
+      ) : null}
+
+      {/* Integrity Warning Toast */}
+      {integrityWarning && (
+        <div className="fixed bottom-6 right-6 z-[60] flex max-w-sm animate-bounce items-center gap-3 rounded-xl bg-red-600 px-4 py-3 text-sm font-bold text-white shadow-xl">
+          <span className="material-symbols-outlined shrink-0 text-[18px]">
+            warning
+          </span>
+          <p>{integrityWarning}</p>
+        </div>
+      )}
+
+      {submitSummary ? (
+        <div className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-slate-900/90 p-6 text-center text-white">
+          <span className="material-symbols-outlined mb-4 text-6xl text-emerald-400">
+            task_alt
+          </span>
+          <h2 className="mb-2 text-2xl font-black">Exam submitted</h2>
+          <p className="mb-6 max-w-md text-slate-300">
+            Your answers were graded against all test cases (including hidden).
+          </p>
+          <p className="mb-8 font-mono text-4xl font-black text-white">
+            {submitSummary.totalScore}
+            <span className="text-lg font-bold text-slate-400">
+              {" "}
+              / {submitSummary.maxTotalMarks}
+            </span>
+          </p>
+          <button
+            type="button"
+            onClick={() => router.push("/student/dashboard")}
+            className="rounded-xl bg-primary px-8 py-3 text-sm font-bold text-white shadow-lg transition hover:bg-primary/90"
+          >
+            Back to dashboard
+          </button>
+        </div>
+      ) : null}
+
       <header className="shrink-0 border-b border-primary/10 bg-white px-2">
         <div className="mx-auto flex max-w-[1920px] items-center justify-between gap-4 px-4 py-3 md:px-6">
           <div className="min-w-0">
@@ -1017,7 +1324,20 @@ export default function StudentExamRoomPage() {
             </h1>
           </div>
 
-          <div className="flex items-center gap-4">
+          <div className="flex flex-wrap items-center justify-end gap-3">
+            {roomData && !submitSummary ? (
+              <button
+                type="button"
+                onClick={submitEntireExam}
+                disabled={submittingExam}
+                className="inline-flex items-center gap-2 rounded-lg border-2 border-emerald-600 bg-emerald-50 px-4 py-2 text-sm font-bold text-emerald-800 shadow-sm transition hover:bg-emerald-100 disabled:pointer-events-none disabled:opacity-50"
+              >
+                <span className="material-symbols-outlined text-[20px]">
+                  send
+                </span>
+                {submittingExam ? "Submitting…" : "Submit exam"}
+              </button>
+            ) : null}
             {roomData ? (
               <div className="flex flex-col items-end">
                 <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
@@ -1321,6 +1641,9 @@ export default function StudentExamRoomPage() {
                       }
                       onKeyDown={handleEditorKeyDown}
                       onScroll={handleEditorScroll}
+                      onPaste={handlePaste}
+                      onCopy={handleCopyCut}
+                      onCut={handleCopyCut}
                       readOnly={roomEnded}
                       spellCheck={false}
                       className="absolute inset-0 h-full w-full resize-none overflow-auto whitespace-pre break-normal bg-transparent py-6 pr-6 pl-20 font-mono text-[15px] leading-relaxed text-transparent caret-white outline-none selection:bg-blue-500/30 placeholder:text-slate-600 read-only:cursor-not-allowed"
@@ -1436,7 +1759,7 @@ export default function StudentExamRoomPage() {
                                     <div className="mt-4 grid gap-3 lg:grid-cols-3">
                                       <div className="rounded-xl bg-slate-950 p-3">
                                         <p className="text-[11px] font-bold uppercase tracking-wide text-slate-400">
-                                          Input
+                                          Input Sent
                                         </p>
                                         <pre className="mt-2 overflow-x-auto whitespace-pre-wrap font-mono text-xs leading-6 text-slate-100">
                                           {testCase.input || "(empty input)"}
@@ -1453,7 +1776,7 @@ export default function StudentExamRoomPage() {
                                       </div>
                                       <div className="rounded-xl bg-slate-950 p-3">
                                         <p className="text-[11px] font-bold uppercase tracking-wide text-slate-400">
-                                          Actual
+                                          Result
                                         </p>
                                         <pre className="mt-2 overflow-x-auto whitespace-pre-wrap font-mono text-xs leading-6 text-slate-100">
                                           {testCase.actualOutput ||

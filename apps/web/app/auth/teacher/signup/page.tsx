@@ -23,7 +23,7 @@ export default function TeacherSignup() {
     setLoading(true);
 
     try {
-      await axios.post(`${API_URL}/api/signup`, { name, email, password });
+      await axios.post(`${API_URL}/api/signup/faculty`, { name, email, password });
       router.push("/auth/teacher/login?registered=1");
     } catch (err) {
       const axiosErr = err as AxiosError<{
