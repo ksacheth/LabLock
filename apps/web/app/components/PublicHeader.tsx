@@ -5,7 +5,7 @@ export default function PublicHeader() {
     <header className="flex items-center justify-between border-b border-primary/10 px-6 md:px-20 py-4 bg-background-light/80 backdrop-blur-md sticky top-0 z-50">
       <div className="flex items-center gap-3 text-primary">
         <span className="material-symbols-outlined text-3xl">shield_person</span>
-        <h2 className="text-xl font-bold leading-tight tracking-tight">NITK Proctoring</h2>
+        <h2 className="text-xl font-bold leading-tight tracking-tight">NITK LabLock</h2>
       </div>
       <div className="hidden md:flex flex-1 justify-center gap-8">
         <Link href="#" className="text-primary/80 hover:text-primary text-sm font-medium transition-colors">Solutions</Link>

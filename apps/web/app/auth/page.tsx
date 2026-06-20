@@ -61,7 +61,7 @@ export default function LabProctor() {
                   </h3>
                   <p className="text-slate-500 dark:text-slate-400 mb-8 leading-relaxed">
                     Create new lab sessions, monitor students, and manage
-                    automated proctoring rules.
+                    automated exam lockdown rules.
                   </p>
                   <div className="mt-auto space-y-3">
                     <Link
@@ -121,7 +121,7 @@ export default function LabProctor() {
                         Trusted by 500+ Institutions
                       </h4>
                       <p className="text-white/80 text-sm">
-                        LabProctor provides the industry's most reliable
+                        LabLock provides the industry's most reliable
                         automated supervision for remote and on-site practical
                         assessments.
                       </p>
@@ -142,7 +142,7 @@ export default function LabProctor() {
                     System Status
                   </a>
                 </div>
-                <p>© 2024 LabProctor Inc. All rights reserved.</p>
+                <p>© 2024 LabLock Inc. All rights reserved.</p>
               </footer> */}
             </div>
           </main>

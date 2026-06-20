@@ -79,7 +79,7 @@ export default function NITKProctoringPage() {
               </div>
               <p className="text-slate-500 text-sm leading-relaxed">
                 National Institute of Technology Karnataka, Surathkal.
-                Department of Information Technology Proctoring Initiative.
+                Department of Information Technology Lab Examination Initiative.
               </p>
             </div>
             <div>
@@ -98,7 +98,7 @@ export default function NITKProctoringPage() {
                     href="#"
                     className="hover:text-primary transition-colors"
                   >
-                    Live Proctoring
+                    Live Monitoring
                   </Link>
                 </li>
                 <li>

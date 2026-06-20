@@ -463,7 +463,7 @@ export default function AdminDashboard() {
             </div>
             <div>
               <h1 className="text-primary font-bold text-lg leading-tight">
-                Lab Proctor
+                LabLock
               </h1>
               <p className="text-xs text-secondary font-medium">Admin Console</p>
             </div>

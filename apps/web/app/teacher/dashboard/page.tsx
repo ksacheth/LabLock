@@ -433,7 +433,7 @@ export default function TeacherDashboard() {
           </div>
           <div>
             <h1 className="text-primary font-bold text-lg leading-tight">
-              Lab Proctor
+              LabLock
             </h1>
             <p className="text-xs text-secondary font-medium">Teacher Portal</p>
           </div>
@@ -513,7 +513,7 @@ export default function TeacherDashboard() {
             Teacher Dashboard
           </h2>
           <p className="text-slate-500 mt-1">
-            Manage your lab exams, questions, and active proctoring sessions.
+            Manage your lab exams, questions, and active exam sessions.
           </p>
         </header>
 
@@ -805,7 +805,7 @@ export default function TeacherDashboard() {
             {/* Recent Activity */}
             <div className="mt-10">
               <h3 className="text-xl font-bold text-primary mb-4 px-1">
-                Active Proctored Sessions
+                Active Exam Sessions
               </h3>
               <div className="bg-white dark:bg-slate-800 rounded-xl border border-primary/10 shadow-sm overflow-hidden">
                 {liveExams.length === 0 ? (
@@ -814,7 +814,7 @@ export default function TeacherDashboard() {
                       podcasts
                     </span>
                     No active sessions. Go live on a draft exam to start
-                    proctoring.
+                    monitoring.
                   </div>
                 ) : (
                   <table className="w-full text-left">

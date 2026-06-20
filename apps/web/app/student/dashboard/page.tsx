@@ -205,7 +205,7 @@ export default function LabProctorDashboard() {
                 <span className="material-symbols-outlined">biotech</span>
               </div>
               <h2 className="text-primary text-xl font-bold tracking-tight">
-                LabProctor
+                LabLock
               </h2>
             </div>
             <nav className="hidden md:flex items-center gap-8">
@@ -575,13 +575,13 @@ export default function LabProctorDashboard() {
                     </button>
                   </section>
 
-                  {/* Proctor Tip */}
+                  {/* Exam Tip */}
                   <section className="bg-accent/10 p-6 rounded-xl border border-accent/20">
                     <div className="flex items-center gap-3 mb-2">
                       <span className="material-symbols-outlined text-primary">
                         info
                       </span>
-                      <h4 className="font-bold text-primary">Proctor Tip</h4>
+                      <h4 className="font-bold text-primary">Exam Tip</h4>
                     </div>
                     <p className="text-xs text-slate-600 leading-relaxed">
                       Ensure your room is well-lit and your desk is clear of any
@@ -602,7 +602,7 @@ export default function LabProctorDashboard() {
                 biotech
               </span>
               <span className="text-sm font-bold text-primary">
-                LabProctor v2.4.0
+                LabLock v2.4.0
               </span>
             </div>
             <div className="flex gap-6 text-xs font-medium text-slate-500">
@@ -617,7 +617,7 @@ export default function LabProctorDashboard() {
               </a>
             </div>
             <div className="text-xs text-slate-400">
-              © 2024 LabProctor Systems Inc.
+              © 2024 LabLock Systems Inc.
             </div>
           </div>
         </footer>

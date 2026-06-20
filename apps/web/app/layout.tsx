@@ -9,8 +9,8 @@ const lexend = Lexend({
 });
 
 export const metadata: Metadata = {
-  title: "NITK Lab Proctor",
-  description: "Secure online proctoring for NITK lab examinations",
+  title: "NITK LabLock",
+  description: "Secure browser lockdown for NITK lab examinations",
 };
 
 export default function RootLayout({
