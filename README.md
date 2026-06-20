@@ -1,9 +1,9 @@
-# Lab Exam Proctoring System with Online Compiler
+# Lab Exam Lockdown System with Online Compiler
 
 ## 1. Introduction
 Lab examinations are essential for evaluating students' practical programming skills. However, traditional lab exams face issues such as missing compilers, system inconsistencies, and increased cheating due to easy access to online resources and LLMs.
 
-This project proposes a centralized solution that integrates an online compiler with an exam-oriented proctoring system.
+This project proposes a centralized solution that integrates an online compiler with an exam-oriented lockdown and integrity-monitoring system.
 
 ## 2. Objective
 The objectives of this project are:
@@ -27,7 +27,7 @@ Current lab exam systems suffer from the following drawbacks:
 We propose a web-based platform that combines:
 
 - Online compiler: A centralized, browser-based compiler preconfigured with required programming languages, ensuring identical execution environments for all students.
-- Proctoring system: Continuous monitoring during exams to detect suspicious activities such as tab switching, unauthorized access, or abnormal behavior patterns.
+- Exam lockdown: Browser-level enforcement that requires fullscreen, detects tab switching and focus loss, blocks copy and paste, and logs integrity violations with a strike-based auto-ban.
 
 By integrating both components, the system creates a controlled and fair examination environment while eliminating local setup dependencies.
 
@@ -61,7 +61,7 @@ The system is built using the following technologies to ensure scalability, perf
 
 - Requires stable internet connectivity.
 - Students must use a compatible web browser.
-- Effectiveness of proctoring depends on monitoring rules and system accuracy.
+- Effectiveness of integrity monitoring depends on lockdown rules and system accuracy; it cannot observe the physical exam environment.
 
 ## 9. Future Scope
 
@@ -70,7 +70,7 @@ The system is built using the following technologies to ensure scalability, perf
 - Integration with institutional systems such as LMS.
 
 ## 10. Conclusion
-The Lab Exam Proctoring System with an Online Compiler addresses key challenges in conducting lab exams. By ensuring a uniform coding environment and strengthening exam monitoring, the proposed system improves exam efficiency, fairness, and academic integrity.
+The Lab Exam Lockdown System with an Online Compiler addresses key challenges in conducting lab exams. By ensuring a uniform coding environment and strengthening exam monitoring, the proposed system improves exam efficiency, fairness, and academic integrity.
 
 ## Database Schema
 

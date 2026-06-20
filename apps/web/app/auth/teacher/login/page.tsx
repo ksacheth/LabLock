@@ -72,7 +72,7 @@ export default function TeacherLogin() {
                 Teacher Login
               </h1>
               <p className="text-slate-500 dark:text-slate-400 text-sm mt-1">
-                Manage lab sessions and proctor your students
+                Manage lab sessions and monitor your students
               </p>
             </div>
 
