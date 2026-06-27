@@ -1,7 +1,7 @@
 import type { Express, Request, Response } from "express";
 import prisma from "@repo/database";
 import { authMiddleware } from "../middleware/auth.ts";
-import { rejectUnapprovedFaculty } from "../lib/faculty.ts";
+import { authorizeRequest } from "../authorization/authorize-request.ts";
 
 export function registerFacultyRoutes(app: Express) {
 app.get(
@@ -14,30 +14,15 @@ app.get(
         return res.status(400).json({ error: "examId is required" });
       }
 
-      const faculty = await prisma.user.findUnique({
-        where: { id: _req.userId! },
-      });
-      if (
-        rejectUnapprovedFaculty(
-          res,
-          faculty,
-          "Only faculty members can view exam results",
-        )
-      ) {
-        return;
-      }
-
-      const exam = await prisma.exam.findFirst({
-        where: {
-          id: examId,
-          deletedAt: null,
-          creatorId: faculty!.id,
-        },
+      const exam = await prisma.exam.findUnique({
+        where: { id: examId },
         select: {
           id: true,
           title: true,
           startTime: true,
           endTime: true,
+          creatorId: true,
+          deletedAt: true,
           questions: {
             where: { deletedAt: null },
             select: { marks: true },
@@ -45,9 +30,13 @@ app.get(
         },
       });
 
-      if (!exam) {
-        return res.status(404).json({ error: "Exam not found" });
-      }
+      // role + approval + ownership (incl. 404 for missing/soft-deleted) all
+      // decided by the authorization seam.
+      const actor = await authorizeRequest(_req, res, "exam:results", exam);
+      if (!actor) return;
+      // authorize already returned 404 for a missing/soft-deleted exam; this
+      // narrows the type for the rest of the handler.
+      if (!exam) return;
 
       const totalMarks = exam.questions.reduce((s, q) => s + q.marks, 0);
 
