@@ -8,6 +8,7 @@ import { logApiEvent } from "../lib/logging.ts";
 import { deactivateExpiredExams } from "../lib/exam-status.ts";
 import { judge } from "../execution/judge.ts";
 import { upsertStudentSubmissionRecord } from "../lib/submissions.ts";
+import { authorizeRequest } from "../authorization/authorize-request.ts";
 
 export function registerStudentRoutes(app: Express) {
 app.post(
@@ -18,20 +19,15 @@ app.post(
       const now = new Date();
       await deactivateExpiredExams(now);
 
+      const actor = await authorizeRequest(_req, res, "student:enter");
+      if (!actor) return;
+
+      // The eligibility check below needs the student's batch/department, so the
+      // handler still loads the full record (authorize already confirmed it exists).
       const student = await prisma.user.findUnique({
         where: { id: _req.userId! },
       });
-
-      if (!student || student.role !== "STUDENT") {
-        logApiEvent("exam.enter.denied", {
-          userId: _req.userId ?? null,
-          examId: _req.params.id ?? null,
-          reason: "non_student",
-        });
-        return res
-          .status(403)
-          .json({ error: "Only students can enter an exam room" });
-      }
+      if (!student) return;
 
       const exam = await prisma.exam.findUnique({
         where: { id: _req.params.id },
@@ -269,14 +265,8 @@ app.put(
       const now = new Date();
       await deactivateExpiredExams(now);
 
-      const student = await prisma.user.findUnique({
-        where: { id: _req.userId! },
-      });
-      if (!student || student.role !== "STUDENT") {
-        return res
-          .status(403)
-          .json({ error: "Only students can save exam drafts" });
-      }
+      const student = await authorizeRequest(_req, res, "student:draft");
+      if (!student) return;
 
       const exam = await prisma.exam.findUnique({
         where: { id: examId },
@@ -380,14 +370,8 @@ app.post(
         return res.status(400).json({ error: "Invalid violation type" });
       }
 
-      const student = await prisma.user.findUnique({
-        where: { id: _req.userId! },
-      });
-      if (!student || student.role !== "STUDENT") {
-        return res
-          .status(403)
-          .json({ error: "Only students can report violations" });
-      }
+      const student = await authorizeRequest(_req, res, "student:violation");
+      if (!student) return;
 
       const attempt = await prisma.examAttempt.findFirst({
         where: {
@@ -503,14 +487,8 @@ app.post(
       const now = new Date();
       await deactivateExpiredExams(now);
 
-      const student = await prisma.user.findUnique({
-        where: { id: _req.userId! },
-      });
-      if (!student || student.role !== "STUDENT") {
-        return res
-          .status(403)
-          .json({ error: "Only students can run code from the exam room" });
-      }
+      const student = await authorizeRequest(_req, res, "student:run");
+      if (!student) return;
 
       const exam = await prisma.exam.findUnique({
         where: { id: examId },
@@ -670,14 +648,8 @@ app.post(
       const now = new Date();
       await deactivateExpiredExams(now);
 
-      const student = await prisma.user.findUnique({
-        where: { id: _req.userId! },
-      });
-      if (!student || student.role !== "STUDENT") {
-        return res
-          .status(403)
-          .json({ error: "Only students can submit an exam" });
-      }
+      const student = await authorizeRequest(_req, res, "student:submit");
+      if (!student) return;
 
       const exam = await prisma.exam.findFirst({
         where: { id: examId, deletedAt: null },

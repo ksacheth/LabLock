@@ -17,7 +17,12 @@ type Action =
   | "question:delete"
   | "testcase:create"
   | "testcase:update"
-  | "testcase:delete";
+  | "testcase:delete"
+  | "student:enter"
+  | "student:draft"
+  | "student:violation"
+  | "student:run"
+  | "student:submit";
 
 // The owning exam, as authorize needs to see it. `null` ⇒ not found / soft-deleted.
 type Resource = { creatorId: string; deletedAt: Date | null } | null;
@@ -105,6 +110,39 @@ const POLICY: Record<
     requireApproval: true,
     ownership: "exam",
     message: "Only faculty members can delete test cases",
+  },
+  // Student role-gates (issue #13): pure role checks. Exam-time preconditions
+  // (eligibility, time-window, attempt-status) stay inline in the handlers and
+  // are owned by the future ExamSession module.
+  "student:enter": {
+    role: "STUDENT",
+    requireApproval: false,
+    ownership: "none",
+    message: "Only students can enter an exam room",
+  },
+  "student:draft": {
+    role: "STUDENT",
+    requireApproval: false,
+    ownership: "none",
+    message: "Only students can save exam drafts",
+  },
+  "student:violation": {
+    role: "STUDENT",
+    requireApproval: false,
+    ownership: "none",
+    message: "Only students can report violations",
+  },
+  "student:run": {
+    role: "STUDENT",
+    requireApproval: false,
+    ownership: "none",
+    message: "Only students can run code from the exam room",
+  },
+  "student:submit": {
+    role: "STUDENT",
+    requireApproval: false,
+    ownership: "none",
+    message: "Only students can submit an exam",
   },
 };
 

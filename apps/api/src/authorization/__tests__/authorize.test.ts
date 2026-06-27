@@ -282,3 +282,42 @@ test("managing a test case whose owning exam is missing/soft-deleted is a 404", 
     error: "Exam not found",
   });
 });
+
+// ─── Student role-gate (issue #13) ───────────────────────────────────────────
+// Student actions are pure role-gates: { role: STUDENT, requireApproval: false,
+// ownership: "none" }. The exam-time preconditions stay inline in the handlers.
+
+const student = { id: "s1", role: "STUDENT" as const, facultyApproved: true };
+
+// Every student route is the same pure role-gate; only the denial message
+// differs. Table-driven across the action × {student, non-student, null actor}.
+const studentActions = [
+  { action: "student:enter" as const, message: "Only students can enter an exam room" },
+  { action: "student:draft" as const, message: "Only students can save exam drafts" },
+  { action: "student:violation" as const, message: "Only students can report violations" },
+  { action: "student:run" as const, message: "Only students can run code from the exam room" },
+  { action: "student:submit" as const, message: "Only students can submit an exam" },
+];
+
+for (const { action, message } of studentActions) {
+  test(`a student is allowed ${action}`, () => {
+    expect(authorize(student, action)).toEqual({ ok: true });
+  });
+
+  test(`a non-student is forbidden ${action}`, () => {
+    expect(authorize(approvedFaculty, action)).toEqual({
+      ok: false,
+      status: 403,
+      error: message,
+    });
+  });
+
+  test(`a null actor on ${action} is an authentication failure`, () => {
+    expect(authorize(null, action)).toEqual({
+      ok: false,
+      status: 401,
+      error: "Account not found",
+      code: "ACCOUNT_NOT_FOUND",
+    });
+  });
+}
