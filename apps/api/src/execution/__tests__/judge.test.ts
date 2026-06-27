@@ -139,14 +139,24 @@ test("mixed cases aggregate to the highest-priority status and count passes", as
   expect(result.totalCount).toBe(3);
 });
 
-test("a runner-level error throws (preserves today's 500 behavior)", async () => {
+test("a runner-level error yields SYSTEM_ERROR (not the student's fault)", async () => {
   const runner = createFakeRunner({
     compile: { ok: false, timedOut: false, durationMs: 0, stderr: "" },
     cases: [],
     error: { kind: "RUNNER_SPAWN_FAILED", message: "spawn gcc ENOENT" },
   });
 
-  await expect(
-    judge({ code: "x", language: "C" }, oneCase, { timeLimitMs: 1000 }, runner),
-  ).rejects.toThrow("RUNNER_SPAWN_FAILED");
+  const result = await judge(
+    { code: "x", language: "C" },
+    oneCase,
+    { timeLimitMs: 1000 },
+    runner,
+  );
+
+  expect(result.status).toBe("SYSTEM_ERROR");
+  expect(result.passedCount).toBe(0);
+  expect(result.totalCount).toBe(1);
+  expect(result.testCaseResults).toHaveLength(0);
+  expect(result.storedTestCaseResults).toHaveLength(0);
+  expect(result.stdErr).toContain("RUNNER_SPAWN_FAILED");
 });
