@@ -14,7 +14,10 @@ type ExecutionSubmissionStatus =
   | "WRONG_ANSWER"
   | "COMPILE_ERROR"
   | "RUNTIME_ERROR"
-  | "TIME_LIMIT_EXCEEDED";
+  | "TIME_LIMIT_EXCEEDED"
+  // Runner-level (infrastructure) failure — "re-run me", not a student outcome.
+  // See docs/adr/0002-system-error-status.md.
+  | "SYSTEM_ERROR";
 
 type StoredTestCaseResult = {
   testCaseId: string;
