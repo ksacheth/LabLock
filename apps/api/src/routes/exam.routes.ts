@@ -3,8 +3,11 @@ import prisma from "@repo/database";
 import { ExamSchema, UpdateExamSchema } from "@common/types";
 import { authMiddleware } from "../middleware/auth.ts";
 import { logApiEvent } from "../lib/logging.ts";
-import { FACULTY_PENDING_MSG } from "../lib/faculty.ts";
 import { authorizeRequest } from "../authorization/authorize-request.ts";
+import {
+  FACULTY_PENDING_MSG,
+  FACULTY_PENDING_APPROVAL,
+} from "../authorization/authorize.ts";
 import { calculateExamEndTime, isExamCurrentlyActive, deactivateExpiredExams } from "../lib/exam-status.ts";
 
 export function registerExamRoutes(app: Express) {
@@ -98,7 +101,7 @@ app.get(
         if (!user.facultyApproved) {
           return res.status(403).json({
             error: FACULTY_PENDING_MSG,
-            code: "FACULTY_PENDING_APPROVAL",
+            code: FACULTY_PENDING_APPROVAL,
           });
         }
         const exams = await prisma.exam.findMany({
