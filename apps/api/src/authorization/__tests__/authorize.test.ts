@@ -141,6 +141,28 @@ test("a missing actor is an authentication failure, not a forbidden one", () => 
   });
 });
 
+test("an admin may perform an admin-only action", () => {
+  const admin = { id: "a1", role: "ADMIN" as const, facultyApproved: false };
+  expect(authorize(admin, "user:admin")).toEqual({ ok: true });
+});
+
+test("a non-admin actor cannot perform an admin-only action", () => {
+  expect(authorize(approvedFaculty, "user:admin")).toEqual({
+    ok: false,
+    status: 403,
+    error: "Unauthorized",
+  });
+});
+
+test("a null actor on an admin-only action is an authentication failure", () => {
+  expect(authorize(null, "user:admin")).toEqual({
+    ok: false,
+    status: 401,
+    error: "Account not found",
+    code: "ACCOUNT_NOT_FOUND",
+  });
+});
+
 test("an unapproved faculty member is told approval is pending", () => {
   const pending = { id: "f2", role: "FACULTY" as const, facultyApproved: false };
   expect(authorize(pending, "exam:create")).toEqual({
