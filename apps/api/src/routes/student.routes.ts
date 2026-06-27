@@ -596,6 +596,21 @@ app.post(
         { timeLimitMs: question.timeLimitMs },
       );
 
+      // Runner-level failure: not the student's fault. Record nothing and ask
+      // them to retry rather than persisting a bogus run. See ADR-0002.
+      if (executionResult.status === "SYSTEM_ERROR") {
+        logApiEvent("exam.code.run.system_error", {
+          userId: student.id,
+          examId,
+          questionId,
+          attemptId: attempt.id,
+          stdErr: executionResult.stdErr,
+        });
+        return res.status(503).json({
+          error: "Code execution is temporarily unavailable. Please try again.",
+        });
+      }
+
       const submission = await upsertStudentSubmissionRecord({
         attemptId: attempt.id,
         userId: student.id,
@@ -725,6 +740,7 @@ app.post(
         status: ExecutionSubmissionStatus | "PENDING";
         passedCount: number;
         totalCount: number;
+        needsRerun?: boolean;
       }> = [];
 
       for (const question of questions) {
@@ -841,6 +857,9 @@ app.post(
           status: executionResult.status,
           passedCount: executionResult.passedCount,
           totalCount: executionResult.totalCount,
+          // Quarantined: an infrastructure failure, scored 0 and flagged for a
+          // re-run rather than counted as a wrong answer. See ADR-0002.
+          needsRerun: executionResult.status === "SYSTEM_ERROR",
         });
       }
 
