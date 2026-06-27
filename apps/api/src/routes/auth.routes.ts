@@ -7,7 +7,10 @@ import { authMiddleware } from "../middleware/auth.ts";
 import { portalLabelByRole, isPortalRole } from "../types.ts";
 import type { PortalRole } from "../types.ts";
 import { logApiEvent } from "../lib/logging.ts";
-import { FACULTY_PENDING_MSG } from "../lib/faculty.ts";
+import {
+  FACULTY_PENDING_MSG,
+  FACULTY_PENDING_APPROVAL,
+} from "../authorization/authorize.ts";
 
 export function registerAuthRoutes(app: Express) {
 app.post("/api/signup", async (_req: Request, res: Response) => {
@@ -171,7 +174,7 @@ app.post("/api/signin", async (_req: Request, res: Response) => {
       });
       return res.status(403).json({
         error: FACULTY_PENDING_MSG,
-        code: "FACULTY_PENDING_APPROVAL",
+        code: FACULTY_PENDING_APPROVAL,
       });
     }
 
@@ -221,7 +224,7 @@ app.get("/api/me", authMiddleware, async (_req: Request, res: Response) => {
     if (user.role === "FACULTY" && !user.facultyApproved) {
       return res.status(403).json({
         error: FACULTY_PENDING_MSG,
-        code: "FACULTY_PENDING_APPROVAL",
+        code: FACULTY_PENDING_APPROVAL,
       });
     }
     const { password: _, ...safeUser } = user;
