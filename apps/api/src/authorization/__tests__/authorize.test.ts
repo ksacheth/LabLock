@@ -78,6 +78,60 @@ test("role is checked before resource existence (wrong role on a missing exam is
   });
 });
 
+test("approved faculty may create a question on an exam they own", () => {
+  expect(authorize(approvedFaculty, "question:create", ownedExam)).toEqual({
+    ok: true,
+  });
+});
+
+test("a non-faculty actor cannot create a question", () => {
+  const student = { id: "s1", role: "STUDENT" as const, facultyApproved: false };
+  expect(authorize(student, "question:create", ownedExam)).toEqual({
+    ok: false,
+    status: 403,
+    error: "Only faculty members can add questions",
+  });
+});
+
+test("approved faculty may update a question whose exam they own", () => {
+  expect(authorize(approvedFaculty, "question:update", ownedExam)).toEqual({
+    ok: true,
+  });
+});
+
+test("a non-faculty actor cannot update a question", () => {
+  const student = { id: "s1", role: "STUDENT" as const, facultyApproved: false };
+  expect(authorize(student, "question:update", ownedExam)).toEqual({
+    ok: false,
+    status: 403,
+    error: "Only faculty members can update questions",
+  });
+});
+
+test("approved faculty may delete a question whose exam they own", () => {
+  expect(authorize(approvedFaculty, "question:delete", ownedExam)).toEqual({
+    ok: true,
+  });
+});
+
+test("a non-faculty actor cannot delete a question", () => {
+  const student = { id: "s1", role: "STUDENT" as const, facultyApproved: false };
+  expect(authorize(student, "question:delete", ownedExam)).toEqual({
+    ok: false,
+    status: 403,
+    error: "Only faculty members can delete questions",
+  });
+});
+
+test("a question on an exam owned by someone else is forbidden", () => {
+  const someoneElsesExam = { creatorId: "other", deletedAt: null };
+  expect(authorize(approvedFaculty, "question:update", someoneElsesExam)).toEqual({
+    ok: false,
+    status: 403,
+    error: "You are not the creator of this exam",
+  });
+});
+
 test("a missing actor is an authentication failure, not a forbidden one", () => {
   expect(authorize(null, "exam:create")).toEqual({
     ok: false,
