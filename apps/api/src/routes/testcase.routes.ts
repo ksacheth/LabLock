@@ -2,26 +2,13 @@ import type { Express, Request, Response } from "express";
 import prisma from "@repo/database";
 import { TestCaseSchema, UpdateTestCaseSchema } from "@common/types";
 import { authMiddleware } from "../middleware/auth.ts";
-import { rejectUnapprovedFaculty } from "../lib/faculty.ts";
+import { authorizeRequest } from "../authorization/authorize-request.ts";
 
 export function registerTestcaseRoutes(app: Express) {
 app.post(
   "/api/questions/:id/testcases",
   authMiddleware,
   async (_req: Request, res: Response) => {
-    const faculty = await prisma.user.findUnique({
-      where: { id: _req.userId! },
-    });
-    if (
-      rejectUnapprovedFaculty(
-        res,
-        faculty,
-        "Only faculty members can add test cases",
-      )
-    ) {
-      return;
-    }
-
     const result = TestCaseSchema.safeParse(_req.body);
     if (!result.success) {
       return res
@@ -32,6 +19,7 @@ app.post(
     const { input, expectedOutput, isHidden, weight } = result.data;
 
     try {
+      // Leaf existence stays a handler precondition before the authorize call.
       const question = await prisma.question.findUnique({
         where: { id: _req.params.id },
         include: { exam: true },
@@ -41,11 +29,14 @@ app.post(
         return res.status(404).json({ error: "Question not found" });
       }
 
-      if (question.exam.creatorId !== faculty!.id) {
-        return res
-          .status(403)
-          .json({ error: "You are not the creator of this exam" });
-      }
+      // Ownership reaches the exam through test-case → question → exam.
+      const actor = await authorizeRequest(
+        _req,
+        res,
+        "testcase:create",
+        question.exam,
+      );
+      if (!actor) return;
 
       if (question.exam.isActive) {
         return res
@@ -74,19 +65,6 @@ app.patch(
   "/api/testcases/:id",
   authMiddleware,
   async (_req: Request, res: Response) => {
-    const faculty = await prisma.user.findUnique({
-      where: { id: _req.userId! },
-    });
-    if (
-      rejectUnapprovedFaculty(
-        res,
-        faculty,
-        "Only faculty members can update test cases",
-      )
-    ) {
-      return;
-    }
-
     const result = UpdateTestCaseSchema.safeParse(_req.body);
     if (!result.success) {
       return res
@@ -95,7 +73,8 @@ app.patch(
     }
 
     try {
-      // Traverse testCase → question → exam to verify ownership
+      // Traverse testCase → question → exam to resolve the owning exam.
+      // Leaf existence stays a handler precondition before the authorize call.
       const testCase = await prisma.testCase.findUnique({
         where: { id: _req.params.id },
         include: { question: { include: { exam: true } } },
@@ -109,11 +88,13 @@ app.patch(
         return res.status(404).json({ error: "Question has been deleted" });
       }
 
-      if (testCase.question.exam.creatorId !== faculty!.id) {
-        return res
-          .status(403)
-          .json({ error: "You are not the creator of this exam" });
-      }
+      const actor = await authorizeRequest(
+        _req,
+        res,
+        "testcase:update",
+        testCase.question.exam,
+      );
+      if (!actor) return;
 
       if (testCase.question.exam.isActive) {
         return res
@@ -145,21 +126,9 @@ app.delete(
   "/api/testcases/:id",
   authMiddleware,
   async (_req: Request, res: Response) => {
-    const faculty = await prisma.user.findUnique({
-      where: { id: _req.userId! },
-    });
-    if (
-      rejectUnapprovedFaculty(
-        res,
-        faculty,
-        "Only faculty members can delete test cases",
-      )
-    ) {
-      return;
-    }
-
     try {
-      // Traverse testCase → question → exam to verify ownership
+      // Traverse testCase → question → exam to resolve the owning exam.
+      // Leaf existence stays a handler precondition before the authorize call.
       const testCase = await prisma.testCase.findUnique({
         where: { id: _req.params.id },
         include: { question: { include: { exam: true } } },
@@ -173,11 +142,13 @@ app.delete(
         return res.status(404).json({ error: "Question has been deleted" });
       }
 
-      if (testCase.question.exam.creatorId !== faculty!.id) {
-        return res
-          .status(403)
-          .json({ error: "You are not the creator of this exam" });
-      }
+      const actor = await authorizeRequest(
+        _req,
+        res,
+        "testcase:delete",
+        testCase.question.exam,
+      );
+      if (!actor) return;
 
       if (testCase.question.exam.isActive) {
         return res
