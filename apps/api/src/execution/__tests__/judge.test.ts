@@ -1,94 +1,93 @@
 import { test, expect } from "bun:test";
 import { judge } from "../judge.ts";
 import { createFakeRunner } from "./fake-runner.ts";
-import type { StudentVisibleTestCase } from "../../types.ts";
+import type {
+  StudentVisibleTestCase,
+  ExecutionSubmissionStatus,
+} from "../../types.ts";
+import type { RunnerCaseResult } from "../runner.ts";
 
 const oneCase: StudentVisibleTestCase[] = [
   { id: "c1", input: "1 2\n", expectedOutput: "3", isHidden: false },
 ];
 
-test("a passing case yields ACCEPTED", async () => {
+// Judge a single test case that compiled cleanly, given the runner's output.
+function judgeSingleCase(caseResult: Partial<RunnerCaseResult>) {
   const runner = createFakeRunner({
     compile: { ok: true, timedOut: false, durationMs: 5, stderr: "" },
     cases: [
-      { id: "c1", stdout: "3", stderr: "", exitCode: 0, timedOut: false, durationMs: 2 },
+      {
+        id: "c1",
+        stdout: "",
+        stderr: "",
+        exitCode: 0,
+        timedOut: false,
+        durationMs: 2,
+        ...caseResult,
+      },
     ],
     error: null,
   });
-
-  const result = await judge(
-    { code: "print(sum(map(int, input().split())))", language: "PYTHON3" },
-    oneCase,
-    { timeLimitMs: 1000 },
-    runner,
-  );
-
-  expect(result.status).toBe("ACCEPTED");
-  expect(result.passedCount).toBe(1);
-  expect(result.totalCount).toBe(1);
-});
-
-test("output that differs from expected yields WRONG_ANSWER", async () => {
-  const runner = createFakeRunner({
-    compile: { ok: true, timedOut: false, durationMs: 5, stderr: "" },
-    cases: [
-      { id: "c1", stdout: "4", stderr: "", exitCode: 0, timedOut: false, durationMs: 2 },
-    ],
-    error: null,
-  });
-
-  const result = await judge(
+  return judge(
     { code: "x", language: "PYTHON3" },
     oneCase,
     { timeLimitMs: 1000 },
     runner,
   );
+}
 
-  expect(result.status).toBe("WRONG_ANSWER");
-  expect(result.passedCount).toBe(0);
-});
+const statusCases: Array<{
+  label: string;
+  result: Partial<RunnerCaseResult>;
+  status: ExecutionSubmissionStatus;
+  passedCount: number;
+  errorContains?: string;
+  stdErr?: string;
+}> = [
+  {
+    label: "output matching the expected value yields ACCEPTED",
+    result: { stdout: "3" },
+    status: "ACCEPTED",
+    passedCount: 1,
+  },
+  {
+    label: "output differing from expected yields WRONG_ANSWER",
+    result: { stdout: "4" },
+    status: "WRONG_ANSWER",
+    passedCount: 0,
+  },
+  {
+    label: "a timed-out case yields TIME_LIMIT_EXCEEDED",
+    result: { timedOut: true, exitCode: null, durationMs: 1000 },
+    status: "TIME_LIMIT_EXCEEDED",
+    passedCount: 0,
+    errorContains: "exceeded",
+  },
+  {
+    label: "a non-zero exit code yields RUNTIME_ERROR",
+    result: { stderr: "Segmentation fault", exitCode: 139 },
+    status: "RUNTIME_ERROR",
+    passedCount: 0,
+    stdErr: "Segmentation fault",
+  },
+];
 
-test("a timed-out case yields TIME_LIMIT_EXCEEDED", async () => {
-  const runner = createFakeRunner({
-    compile: { ok: true, timedOut: false, durationMs: 5, stderr: "" },
-    cases: [
-      { id: "c1", stdout: "", stderr: "", exitCode: null, timedOut: true, durationMs: 1000 },
-    ],
-    error: null,
-  });
+test.each(statusCases)(
+  "single case: $label",
+  async ({ result: caseResult, status, passedCount, errorContains, stdErr }) => {
+    const result = await judgeSingleCase(caseResult);
 
-  const result = await judge(
-    { code: "x", language: "PYTHON3" },
-    oneCase,
-    { timeLimitMs: 1000 },
-    runner,
-  );
-
-  expect(result.status).toBe("TIME_LIMIT_EXCEEDED");
-  expect(result.passedCount).toBe(0);
-  expect(result.testCaseResults[0]?.error).toContain("exceeded");
-});
-
-test("a non-zero exit code yields RUNTIME_ERROR", async () => {
-  const runner = createFakeRunner({
-    compile: { ok: true, timedOut: false, durationMs: 5, stderr: "" },
-    cases: [
-      { id: "c1", stdout: "", stderr: "Segmentation fault", exitCode: 139, timedOut: false, durationMs: 3 },
-    ],
-    error: null,
-  });
-
-  const result = await judge(
-    { code: "x", language: "PYTHON3" },
-    oneCase,
-    { timeLimitMs: 1000 },
-    runner,
-  );
-
-  expect(result.status).toBe("RUNTIME_ERROR");
-  expect(result.passedCount).toBe(0);
-  expect(result.stdErr).toBe("Segmentation fault");
-});
+    expect(result.status).toBe(status);
+    expect(result.passedCount).toBe(passedCount);
+    expect(result.totalCount).toBe(1);
+    if (errorContains !== undefined) {
+      expect(result.testCaseResults[0]?.error).toContain(errorContains);
+    }
+    if (stdErr !== undefined) {
+      expect(result.stdErr).toBe(stdErr);
+    }
+  },
+);
 
 test("a failed compile yields COMPILE_ERROR with no cases run", async () => {
   const runner = createFakeRunner({

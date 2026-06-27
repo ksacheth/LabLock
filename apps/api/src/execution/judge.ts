@@ -4,7 +4,7 @@
 // Runner. See docs/adr/0001-execution-runner-seam.md and CONTEXT.md.
 import { logApiEvent } from "../lib/logging.ts";
 import { hostRunner } from "./host-runner.ts";
-import type { Runner } from "./runner.ts";
+import type { Runner, RunnerCaseResult } from "./runner.ts";
 import type {
   StudentProgrammingLanguage,
   ExecutionSubmissionStatus,
@@ -237,6 +237,70 @@ type JudgeLimits = {
   timeLimitMs: number;
 };
 
+type GradedCase = {
+  status: ExecutionSubmissionStatus;
+  durationMs: number;
+  stderr: string;
+  testCaseResult: StudentRunTestCaseResult;
+  storedTestCaseResult: StoredTestCaseResult;
+};
+
+// Grades a single test case from its runner output: pass/fail, status, and the
+// reported + stored result shapes. Pure — keeps judge()'s loop body trivial.
+function gradeCase(
+  testCase: StudentVisibleTestCase,
+  runnerCase: RunnerCaseResult | undefined,
+  executionInput: string,
+  timeLimitMs: number,
+): GradedCase {
+  const durationMs = runnerCase?.durationMs ?? 0;
+  const actualOutput = normalizeExecutionOutput(runnerCase?.stdout ?? "");
+  const expectedOutput = normalizeExecutionOutput(testCase.expectedOutput);
+  const timedOut = runnerCase?.timedOut ?? false;
+  const runtimeFailed = !timedOut && (runnerCase?.exitCode ?? 1) !== 0;
+  const passed =
+    !timedOut &&
+    !runtimeFailed &&
+    outputsAreEquivalent(actualOutput, expectedOutput);
+  const status: ExecutionSubmissionStatus = timedOut
+    ? "TIME_LIMIT_EXCEEDED"
+    : runtimeFailed
+      ? "RUNTIME_ERROR"
+      : passed
+        ? "ACCEPTED"
+        : "WRONG_ANSWER";
+
+  const stderr = runnerCase?.stderr.trim() ?? "";
+  const error = timedOut
+    ? `Execution exceeded ${timeLimitMs}ms.`
+    : runtimeFailed
+      ? stderr || `Process exited with code ${runnerCase?.exitCode ?? "unknown"}.`
+      : null;
+
+  return {
+    status,
+    durationMs,
+    stderr,
+    testCaseResult: {
+      testCaseId: testCase.id,
+      passed,
+      input: executionInput,
+      expectedOutput: testCase.expectedOutput,
+      actualOutput,
+      executionTimeMs: durationMs,
+      memoryUsedKb: null,
+      error,
+    },
+    storedTestCaseResult: {
+      testCaseId: testCase.id,
+      passed,
+      actualOutput,
+      executionTimeMs: durationMs,
+      memoryUsedKb: null,
+    },
+  };
+}
+
 async function judge(
   submission: JudgeSubmission,
   cases: StudentVisibleTestCase[],
@@ -315,60 +379,27 @@ async function judge(
       (candidate) => candidate.id === testCase.id,
     );
     const executionInput = formattedInputById.get(testCase.id) ?? testCase.input;
-
-    const durationMs = runnerCase?.durationMs ?? 0;
-    highestExecutionTimeMs = Math.max(highestExecutionTimeMs ?? 0, durationMs);
-
-    const actualOutput = normalizeExecutionOutput(runnerCase?.stdout ?? "");
-    const expectedOutput = normalizeExecutionOutput(testCase.expectedOutput);
-    const timedOut = runnerCase?.timedOut ?? false;
-    const runtimeFailed = !timedOut && (runnerCase?.exitCode ?? 1) !== 0;
-    const passed =
-      !timedOut &&
-      !runtimeFailed &&
-      outputsAreEquivalent(actualOutput, expectedOutput);
-    const caseStatus: ExecutionSubmissionStatus = timedOut
-      ? "TIME_LIMIT_EXCEEDED"
-      : runtimeFailed
-        ? "RUNTIME_ERROR"
-        : passed
-          ? "ACCEPTED"
-          : "WRONG_ANSWER";
+    const graded = gradeCase(
+      testCase,
+      runnerCase,
+      executionInput,
+      limits.timeLimitMs,
+    );
 
     aggregateStatus = getHigherPriorityExecutionStatus(
       aggregateStatus,
-      caseStatus,
+      graded.status,
     );
-
-    const caseStdErr = runnerCase?.stderr.trim() ?? "";
-    if (!stdErr && caseStdErr) {
-      stdErr = caseStdErr;
+    highestExecutionTimeMs = Math.max(
+      highestExecutionTimeMs ?? 0,
+      graded.durationMs,
+    );
+    if (!stdErr && graded.stderr) {
+      stdErr = graded.stderr;
     }
 
-    const caseError = timedOut
-      ? `Execution exceeded ${limits.timeLimitMs}ms.`
-      : runtimeFailed
-        ? caseStdErr ||
-          `Process exited with code ${runnerCase?.exitCode ?? "unknown"}.`
-        : null;
-
-    testCaseResults.push({
-      testCaseId: testCase.id,
-      passed,
-      input: executionInput,
-      expectedOutput: testCase.expectedOutput,
-      actualOutput,
-      executionTimeMs: durationMs,
-      memoryUsedKb: null,
-      error: caseError,
-    });
-    storedTestCaseResults.push({
-      testCaseId: testCase.id,
-      passed,
-      actualOutput,
-      executionTimeMs: durationMs,
-      memoryUsedKb: null,
-    });
+    testCaseResults.push(graded.testCaseResult);
+    storedTestCaseResults.push(graded.storedTestCaseResult);
   }
 
   return {
