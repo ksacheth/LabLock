@@ -2,6 +2,7 @@ import type { Express, Request, Response, NextFunction } from "express";
 import prisma from "@repo/database";
 import { DepartmentSchema, BatchSchema, AdminUpdateUserSchema } from "@common/types";
 import { authMiddleware } from "../middleware/auth.ts";
+import { authorizeRequest } from "../authorization/authorize-request.ts";
 
 export function registerAdminRoutes(app: Express) {
 app.get(
@@ -22,10 +23,8 @@ app.post(
   "/api/admin/departments",
   authMiddleware,
   async (_req: Request, res: Response) => {
-    const admin = await prisma.user.findUnique({ where: { id: _req.userId! } });
-    if (!admin || admin.role !== "ADMIN") {
-      return res.status(403).json({ error: "Unauthorized" });
-    }
+    const actor = await authorizeRequest(_req, res, "user:admin");
+    if (!actor) return;
 
     const result = DepartmentSchema.safeParse(_req.body);
     if (!result.success) {
@@ -57,10 +56,8 @@ app.get(
   "/api/admin/departments",
   authMiddleware,
   async (_req: Request, res: Response) => {
-    const admin = await prisma.user.findUnique({ where: { id: _req.userId! } });
-    if (!admin || admin.role !== "ADMIN") {
-      return res.status(403).json({ error: "Unauthorized" });
-    }
+    const actor = await authorizeRequest(_req, res, "user:admin");
+    if (!actor) return;
 
     try {
       const departments = await prisma.department.findMany({
@@ -80,10 +77,8 @@ app.post(
   "/api/admin/batches",
   authMiddleware,
   async (_req: Request, res: Response) => {
-    const admin = await prisma.user.findUnique({ where: { id: _req.userId! } });
-    if (!admin || admin.role !== "ADMIN") {
-      return res.status(403).json({ error: "Unauthorized" });
-    }
+    const actor = await authorizeRequest(_req, res, "user:admin");
+    if (!actor) return;
 
     const result = BatchSchema.safeParse(_req.body);
     if (!result.success) {
@@ -127,10 +122,8 @@ app.get(
   "/api/admin/batches",
   authMiddleware,
   async (_req: Request, res: Response) => {
-    const admin = await prisma.user.findUnique({ where: { id: _req.userId! } });
-    if (!admin || admin.role !== "ADMIN") {
-      return res.status(403).json({ error: "Unauthorized" });
-    }
+    const actor = await authorizeRequest(_req, res, "user:admin");
+    if (!actor) return;
 
     // Optional ?departmentId= filter
     const { departmentId } = _req.query;
@@ -158,10 +151,8 @@ app.patch(
   authMiddleware,
   async (_req: Request, res: Response) => {
     // 1. ADMIN only
-    const admin = await prisma.user.findUnique({ where: { id: _req.userId! } });
-    if (!admin || admin.role !== "ADMIN") {
-      return res.status(403).json({ error: "Unauthorized" });
-    }
+    const actor = await authorizeRequest(_req, res, "user:admin");
+    if (!actor) return;
 
     // 2. Validate body
     const result = AdminUpdateUserSchema.safeParse(_req.body);
