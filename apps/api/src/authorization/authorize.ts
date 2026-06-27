@@ -10,6 +10,14 @@ type Action =
   | "exam:create"
   | "exam:update"
   | "exam:delete"
+  | "exam:results"
+  | "user:admin"
+  | "question:create"
+  | "question:update"
+  | "question:delete"
+  | "testcase:create"
+  | "testcase:update"
+  | "testcase:delete"
   | "student:enter"
   | "student:draft"
   | "student:violation"
@@ -54,6 +62,54 @@ const POLICY: Record<
     requireApproval: true,
     ownership: "exam",
     message: "Only faculty members can delete exams",
+  },
+  "exam:results": {
+    role: "FACULTY",
+    requireApproval: true,
+    ownership: "exam",
+    message: "Only faculty members can view exam results",
+  },
+  "user:admin": {
+    role: "ADMIN",
+    requireApproval: false,
+    ownership: "none",
+    message: "Unauthorized",
+  },
+  "question:create": {
+    role: "FACULTY",
+    requireApproval: true,
+    ownership: "exam",
+    message: "Only faculty members can add questions",
+  },
+  "question:update": {
+    role: "FACULTY",
+    requireApproval: true,
+    ownership: "exam",
+    message: "Only faculty members can update questions",
+  },
+  "question:delete": {
+    role: "FACULTY",
+    requireApproval: true,
+    ownership: "exam",
+    message: "Only faculty members can delete questions",
+  },
+  "testcase:create": {
+    role: "FACULTY",
+    requireApproval: true,
+    ownership: "exam",
+    message: "Only faculty members can add test cases",
+  },
+  "testcase:update": {
+    role: "FACULTY",
+    requireApproval: true,
+    ownership: "exam",
+    message: "Only faculty members can update test cases",
+  },
+  "testcase:delete": {
+    role: "FACULTY",
+    requireApproval: true,
+    ownership: "exam",
+    message: "Only faculty members can delete test cases",
   },
   // Student role-gates (issue #13): pure role checks. Exam-time preconditions
   // (eligibility, time-window, attempt-status) stay inline in the handlers and
