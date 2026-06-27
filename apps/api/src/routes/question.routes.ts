@@ -2,7 +2,6 @@ import type { Express, Request, Response } from "express";
 import prisma from "@repo/database";
 import { QuestionSchema, UpdateQuestionSchema } from "@common/types";
 import { authMiddleware } from "../middleware/auth.ts";
-import { rejectUnapprovedFaculty } from "../lib/faculty.ts";
 import { authorizeRequest } from "../authorization/authorize-request.ts";
 
 export function registerQuestionRoutes(app: Express) {
@@ -76,33 +75,16 @@ app.get(
   "/api/exams/:id/questions",
   authMiddleware,
   async (_req: Request, res: Response) => {
-    const faculty = await prisma.user.findUnique({
-      where: { id: _req.userId! },
-    });
-    if (
-      rejectUnapprovedFaculty(
-        res,
-        faculty,
-        "Only faculty members can view questions",
-      )
-    ) {
-      return;
-    }
-
     try {
       const exam = await prisma.exam.findUnique({
         where: { id: _req.params.id },
       });
 
-      if (!exam || exam.deletedAt !== null) {
-        return res.status(404).json({ error: "Exam not found" });
-      }
-
-      if (exam.creatorId !== faculty!.id) {
-        return res
-          .status(403)
-          .json({ error: "You are not the creator of this exam" });
-      }
+      const actor = await authorizeRequest(_req, res, "question:read", exam);
+      if (!actor) return;
+      // authorize already returned 404 for a missing/soft-deleted exam; this
+      // narrows the type for the rest of the handler.
+      if (!exam) return;
 
       const questions = await prisma.question.findMany({
         where: { examId: exam.id, deletedAt: null },
