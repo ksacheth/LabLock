@@ -10,6 +10,7 @@ type Action =
   | "exam:create"
   | "exam:update"
   | "exam:delete"
+  | "user:admin"
   | "question:create"
   | "question:update"
   | "question:delete";
@@ -52,6 +53,12 @@ const POLICY: Record<
     requireApproval: true,
     ownership: "exam",
     message: "Only faculty members can delete exams",
+  },
+  "user:admin": {
+    role: "ADMIN",
+    requireApproval: false,
+    ownership: "none",
+    message: "Unauthorized",
   },
   "question:create": {
     role: "FACULTY",
