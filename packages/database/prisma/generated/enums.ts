@@ -35,7 +35,8 @@ export const SubmissionStatus = {
   COMPILE_ERROR: 'COMPILE_ERROR',
   RUNTIME_ERROR: 'RUNTIME_ERROR',
   TIME_LIMIT_EXCEEDED: 'TIME_LIMIT_EXCEEDED',
-  MEMORY_LIMIT_EXCEEDED: 'MEMORY_LIMIT_EXCEEDED'
+  MEMORY_LIMIT_EXCEEDED: 'MEMORY_LIMIT_EXCEEDED',
+  SYSTEM_ERROR: 'SYSTEM_ERROR'
 } as const
 
 export type SubmissionStatus = (typeof SubmissionStatus)[keyof typeof SubmissionStatus]
