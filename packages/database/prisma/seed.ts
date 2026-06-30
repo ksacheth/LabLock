@@ -12,15 +12,19 @@ const adapter = new PrismaPg(pool);
 const prisma = new PrismaClient({ adapter });
 
 async function main() {
-  const password = await Bun.password.hash("change-me", {
+  const email = process.env.ADMIN_EMAIL ?? "admin@example.com";
+  const name = process.env.ADMIN_NAME ?? "Admin";
+  const plainPassword = process.env.ADMIN_PASSWORD ?? "change-me";
+
+  const password = await Bun.password.hash(plainPassword, {
     algorithm: "bcrypt",
     cost: 12,
   });
 
   await prisma.user.upsert({
-    where: { email: "admin@example.com" },
+    where: { email },
     update: {
-      name: "Admin",
+      name,
       password,
       role: UserRole.ADMIN,
       facultyApproved: true,
@@ -29,13 +33,15 @@ async function main() {
       rollNumber: null,
     },
     create: {
-      email: "admin@example.com",
-      name: "Admin",
+      email,
+      name,
       password,
       role: UserRole.ADMIN,
       facultyApproved: true,
     },
   });
+
+  console.log(`Seeded admin: ${email}`);
 }
 
 main()
