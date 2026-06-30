@@ -185,3 +185,110 @@ test("enter: a student with an in-progress attempt is admitted to resume it", ()
   expect(result.ok).toBe(true);
   if (result.ok) expect(result.attempt).toEqual(inProgress);
 });
+
+// ─── draft + run: coarse window, require IN_PROGRESS, no eligibility (#24) ────
+
+test("draft: an in-progress student in an open window is admitted", () => {
+  const result = evaluateSession("draft", {
+    exam: exam(),
+    attempt: attempt({ status: "IN_PROGRESS" }),
+    student,
+    now: NOW,
+  });
+  expect(result.ok).toBe(true);
+});
+
+test("draft: a student without an in-progress attempt must enter the room first", () => {
+  const result = evaluateSession("draft", {
+    exam: exam(),
+    attempt: null,
+    student,
+    now: NOW,
+  });
+  expect(result).toEqual({
+    ok: false,
+    status: 400,
+    error: "Enter the exam room before saving code drafts",
+    code: "NOT_IN_PROGRESS",
+  });
+});
+
+test("draft: a closed window is refused with the drafts wording", () => {
+  const result = evaluateSession("draft", {
+    exam: exam({ isActive: false }),
+    attempt: attempt({ status: "IN_PROGRESS" }),
+    student,
+    now: NOW,
+  });
+  expect(result).toEqual({
+    ok: false,
+    status: 400,
+    error: "This exam room is not accepting code drafts now",
+    code: "WINDOW_CLOSED",
+  });
+});
+
+test("draft: a missing exam is a not-found refusal", () => {
+  const result = evaluateSession("draft", {
+    exam: null,
+    attempt: attempt({ status: "IN_PROGRESS" }),
+    student,
+    now: NOW,
+  });
+  expect(result).toEqual({
+    ok: false,
+    status: 404,
+    error: "Exam not found",
+    code: "EXAM_NOT_FOUND",
+  });
+});
+
+test("draft: eligibility is NOT checked (an in-progress attempt is enough)", () => {
+  const result = evaluateSession("draft", {
+    exam: exam({ eligibilities: [{ batchId: "other", departmentId: null }] }),
+    attempt: attempt({ status: "IN_PROGRESS" }),
+    student,
+    now: NOW,
+  });
+  expect(result.ok).toBe(true);
+});
+
+test("run: a student without an in-progress attempt must enter the room first", () => {
+  const result = evaluateSession("run", {
+    exam: exam(),
+    attempt: null,
+    student,
+    now: NOW,
+  });
+  expect(result).toEqual({
+    ok: false,
+    status: 400,
+    error: "Enter the exam room before running code",
+    code: "NOT_IN_PROGRESS",
+  });
+});
+
+test("run: a closed window is refused with the runs wording", () => {
+  const result = evaluateSession("run", {
+    exam: exam({ endTime: new Date("2026-01-01T06:00:00Z") }),
+    attempt: attempt({ status: "IN_PROGRESS" }),
+    student,
+    now: NOW,
+  });
+  expect(result).toEqual({
+    ok: false,
+    status: 400,
+    error: "This exam room is not accepting code runs now",
+    code: "WINDOW_CLOSED",
+  });
+});
+
+test("run: an in-progress student in an open window is admitted", () => {
+  const result = evaluateSession("run", {
+    exam: exam(),
+    attempt: attempt({ status: "IN_PROGRESS" }),
+    student,
+    now: NOW,
+  });
+  expect(result.ok).toBe(true);
+});

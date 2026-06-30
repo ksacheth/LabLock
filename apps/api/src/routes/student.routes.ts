@@ -148,32 +148,14 @@ app.put(
         });
       }
 
-      const now = new Date();
-      await deactivateExpiredExams(now);
-
       const student = await authorizeRequest(_req, res, "student:draft");
       if (!student) return;
 
-      const exam = await prisma.exam.findUnique({
-        where: { id: examId },
-        select: {
-          id: true,
-          startTime: true,
-          endTime: true,
-          isActive: true,
-          deletedAt: true,
-        },
-      });
-
-      if (!exam || exam.deletedAt !== null) {
-        return res.status(404).json({ error: "Exam not found" });
-      }
-
-      if (!exam.isActive || exam.startTime > now || exam.endTime <= now) {
-        return res
-          .status(400)
-          .json({ error: "This exam room is not accepting code drafts now" });
-      }
+      const session = await openSession(_req, res, examId, "draft");
+      if (!session) return;
+      const { attempt, now } = session;
+      // openSession already refused a non-in-progress attempt for this intent.
+      if (!attempt) return;
 
       const question = await prisma.question.findFirst({
         where: {
@@ -186,20 +168,6 @@ app.put(
 
       if (!question) {
         return res.status(404).json({ error: "Question not found" });
-      }
-
-      const attempt = await prisma.examAttempt.findFirst({
-        where: {
-          userId: student.id,
-          examId,
-        },
-        orderBy: { retakeNumber: "desc" },
-      });
-
-      if (!attempt || attempt.status !== "IN_PROGRESS") {
-        return res
-          .status(400)
-          .json({ error: "Enter the exam room before saving code drafts" });
       }
 
       const draft = await upsertStudentSubmissionRecord({
@@ -370,32 +338,14 @@ app.post(
         });
       }
 
-      const now = new Date();
-      await deactivateExpiredExams(now);
-
       const student = await authorizeRequest(_req, res, "student:run");
       if (!student) return;
 
-      const exam = await prisma.exam.findUnique({
-        where: { id: examId },
-        select: {
-          id: true,
-          startTime: true,
-          endTime: true,
-          isActive: true,
-          deletedAt: true,
-        },
-      });
-
-      if (!exam || exam.deletedAt !== null) {
-        return res.status(404).json({ error: "Exam not found" });
-      }
-
-      if (!exam.isActive || exam.startTime > now || exam.endTime <= now) {
-        return res
-          .status(400)
-          .json({ error: "This exam room is not accepting code runs now" });
-      }
+      const session = await openSession(_req, res, examId, "run");
+      if (!session) return;
+      const { attempt, now } = session;
+      // openSession already refused a non-in-progress attempt for this intent.
+      if (!attempt) return;
 
       const question = await prisma.question.findFirst({
         where: {
@@ -429,20 +379,6 @@ app.post(
           error:
             "This question has no visible test cases configured for running code",
         });
-      }
-
-      const attempt = await prisma.examAttempt.findFirst({
-        where: {
-          userId: student.id,
-          examId,
-        },
-        orderBy: { retakeNumber: "desc" },
-      });
-
-      if (!attempt || attempt.status !== "IN_PROGRESS") {
-        return res
-          .status(400)
-          .json({ error: "Enter the exam room before running code" });
       }
 
       const executionResult = await judge(
