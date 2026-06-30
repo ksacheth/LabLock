@@ -95,6 +95,38 @@ in `docs/adr/`.
   handler precondition, not an authorization rule.
 
 - **Exam-time preconditions** (eligibility, time-window, attempt-status) are **not**
-  authorization — they belong to the future **ExamSession** module. For student
-  routes `authorize` replaces only the `STUDENT` role-gate; the exam-time logic stays
-  inline.
+  authorization — they belong to the **Exam-session** module below. For student
+  routes `authorize` answers only the `STUDENT` role-gate; `openSession` answers
+  "can this student act now?".
+
+### Exam session
+
+- **ExamSession** — the read-only gate that answers "may this student act on this
+  exam right now?". It owns expire-stale, exam-existence, eligibility, time-window
+  and attempt-status, returning a `Session` or a `Refusal`. It never mutates —
+  attempt writes (create/resume/complete/disqualify) stay in the handlers. Lives in
+  `apps/api/src/exam-session/`. See [ADR-0004](docs/adr/0004-exam-session-seam.md).
+
+- **evaluateSession** — the **pure** core: `evaluateSession(intent, snapshot) →
+  Session | Refusal`. Blind to I/O — the adapter loads `{ exam, attempt, student,
+  now }` and passes them in — so the whole exam-time policy is a table, the test
+  surface.
+
+- **openSession** — the Express/Prisma **adapter**: runs `deactivateExpiredExams`,
+  loads exam/attempt/student, calls `evaluateSession`, and on a `Refusal` sends the
+  response (and logs one uniform `exam.session.refused` event) and returns `null`;
+  on success returns the `Session`. Call site:
+  `const session = await openSession(req, res, examId, "run"); if (!session) return;`.
+
+- **SessionIntent** — `enter | draft | run | submit | violation`, keyed into the
+  policy table. The intents map 1:1 to the student handlers so exact refusal
+  messages survive. Three divergences are **intended** and encoded as rows, not
+  normalized: `submit` skips the time-window, `violation` skips exam/window, and
+  eligibility is checked only on `enter`.
+
+- **Session / Refusal** — `evaluateSession`'s typed result, discriminated on `ok`
+  (like `Decision`). `Session = { ok: true, now, exam, attempt }`;
+  `Refusal = { ok: false, status, error, code?, details? }` — `details` carries the
+  `score` when `submit` refuses an already-`COMPLETED` attempt. `openSession`
+  consumes this: it writes the HTTP response on a `Refusal` and returns
+  `Session | null` to the handler.
