@@ -99,6 +99,16 @@ test("enter: a student matching an eligibility batch is admitted", () => {
   expect(result.ok).toBe(true);
 });
 
+test("enter: a student matching an eligibility department is admitted", () => {
+  const result = evaluateSession("enter", {
+    exam: exam({ eligibilities: [{ batchId: null, departmentId: "d1" }] }),
+    attempt: null,
+    student,
+    now: NOW,
+  });
+  expect(result.ok).toBe(true);
+});
+
 test("enter: an exam that is not live is refused", () => {
   const result = evaluateSession("enter", {
     exam: exam({ isActive: false }),

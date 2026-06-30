@@ -130,28 +130,28 @@ function checkAttempt(policy: Policy, attempt: AttemptSnapshot | null): Refusal 
   }
 }
 
-function evaluateSession(intent: SessionIntent, snapshot: Snapshot): Session | Refusal {
-  const policy = POLICY[intent];
-  const { exam, attempt, student, now } = snapshot;
+function checkEligibility(
+  policy: Policy,
+  exam: ExamSnapshot | null,
+  student: Snapshot["student"],
+): Refusal | null {
+  if (!policy.checkEligibility || !exam) return null;
+  const isEligible =
+    exam.eligibilities.length === 0 ||
+    exam.eligibilities.some(
+      (e) =>
+        (e.batchId !== null && e.batchId === student.batchId) ||
+        (e.departmentId !== null && e.departmentId === student.departmentId),
+    );
+  if (isEligible) return null;
+  return { ok: false, status: 403, error: "You are not eligible to enter this exam room", code: "INELIGIBLE" };
+}
 
-  if (policy.loadExam && (!exam || exam.deletedAt !== null)) {
-    return { ok: false, status: 404, error: "Exam not found", code: "EXAM_NOT_FOUND" };
-  }
-
-  if (policy.checkEligibility && exam) {
-    const isEligible =
-      exam.eligibilities.length === 0 ||
-      exam.eligibilities.some(
-        (e) =>
-          (e.batchId !== null && e.batchId === student.batchId) ||
-          (e.departmentId !== null && e.departmentId === student.departmentId),
-      );
-    if (!isEligible) {
-      return { ok: false, status: 403, error: "You are not eligible to enter this exam room", code: "INELIGIBLE" };
-    }
-  }
-
-  if (exam && policy.window === "granular") {
+// Granular (enter) keeps the original handler's check order — !isActive first —
+// so an expired exam still reports NOT_ACTIVE, not ENDED. See ADR-0004.
+function checkWindow(policy: Policy, exam: ExamSnapshot | null, now: Date): Refusal | null {
+  if (!exam || policy.window === "none") return null;
+  if (policy.window === "granular") {
     if (!exam.isActive) {
       return { ok: false, status: 400, error: "This exam is not live right now", code: "NOT_ACTIVE" };
     }
@@ -161,16 +161,29 @@ function evaluateSession(intent: SessionIntent, snapshot: Snapshot): Session | R
     if (exam.endTime <= now) {
       return { ok: false, status: 400, error: "This exam has already ended", code: "ENDED" };
     }
-  } else if (exam && policy.window === "coarse") {
-    if (!exam.isActive || exam.startTime > now || exam.endTime <= now) {
-      return { ok: false, status: 400, error: policy.windowMessage!, code: "WINDOW_CLOSED" };
-    }
+    return null;
+  }
+  // coarse (draft / run)
+  if (!exam.isActive || exam.startTime > now || exam.endTime <= now) {
+    return { ok: false, status: 400, error: policy.windowMessage!, code: "WINDOW_CLOSED" };
+  }
+  return null;
+}
+
+function evaluateSession(intent: SessionIntent, snapshot: Snapshot): Session | Refusal {
+  const policy = POLICY[intent];
+  const { exam, attempt, student, now } = snapshot;
+
+  if (policy.loadExam && (!exam || exam.deletedAt !== null)) {
+    return { ok: false, status: 404, error: "Exam not found", code: "EXAM_NOT_FOUND" };
   }
 
-  const refusal = checkAttempt(policy, attempt);
-  if (refusal) return refusal;
-
-  return { ok: true, now, exam, attempt };
+  return (
+    checkEligibility(policy, exam, student) ??
+    checkWindow(policy, exam, now) ??
+    checkAttempt(policy, attempt) ??
+    { ok: true, now, exam, attempt }
+  );
 }
 
 export { evaluateSession, POLICY };

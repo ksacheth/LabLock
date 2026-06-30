@@ -124,7 +124,9 @@ in `docs/adr/`.
   normalized: `submit` skips the time-window, `violation` skips exam/window, and
   eligibility is checked only on `enter`.
 
-- **Session / Refusal** — `openSession`'s typed result, discriminated on `ok` (like
-  `Decision`). `Session = { ok: true, now, exam, attempt }`;
+- **Session / Refusal** — `evaluateSession`'s typed result, discriminated on `ok`
+  (like `Decision`). `Session = { ok: true, now, exam, attempt }`;
   `Refusal = { ok: false, status, error, code?, details? }` — `details` carries the
-  `score` when `submit` refuses an already-`COMPLETED` attempt.
+  `score` when `submit` refuses an already-`COMPLETED` attempt. `openSession`
+  consumes this: it writes the HTTP response on a `Refusal` and returns
+  `Session | null` to the handler.
