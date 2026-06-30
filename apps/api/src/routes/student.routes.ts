@@ -5,7 +5,6 @@ import { isStudentProgrammingLanguage, toStudentProgrammingLanguage } from "../t
 import type { ExecutionSubmissionStatus, StudentVisibleTestCase } from "../types.ts";
 import { calculateWeightedQuestionScore } from "../lib/scoring.ts";
 import { logApiEvent } from "../lib/logging.ts";
-import { deactivateExpiredExams } from "../lib/exam-status.ts";
 import { judge } from "../execution/judge.ts";
 import { upsertStudentSubmissionRecord } from "../lib/submissions.ts";
 import { authorizeRequest } from "../authorization/authorize-request.ts";
@@ -227,20 +226,11 @@ app.post(
       const student = await authorizeRequest(_req, res, "student:violation");
       if (!student) return;
 
-      const attempt = await prisma.examAttempt.findFirst({
-        where: {
-          userId: student.id,
-          examId,
-          status: "IN_PROGRESS",
-        },
-        orderBy: { retakeNumber: "desc" },
-      });
-
-      if (!attempt) {
-        return res
-          .status(404)
-          .json({ error: "No active IN_PROGRESS attempt found" });
-      }
+      const session = await openSession(_req, res, examId, "violation");
+      if (!session) return;
+      const { attempt } = session;
+      // openSession already refused when there is no in-progress attempt.
+      if (!attempt) return;
 
       const twoSecondsAgo = new Date(Date.now() - 2000);
       const recentLog = await prisma.proctoringLog.findFirst({
@@ -467,53 +457,14 @@ app.post(
         return res.status(400).json({ error: "examId is required" });
       }
 
-      const now = new Date();
-      await deactivateExpiredExams(now);
-
       const student = await authorizeRequest(_req, res, "student:submit");
       if (!student) return;
 
-      const exam = await prisma.exam.findFirst({
-        where: { id: examId, deletedAt: null },
-        select: {
-          id: true,
-          startTime: true,
-          endTime: true,
-          isActive: true,
-        },
-      });
-
-      if (!exam) {
-        return res.status(404).json({ error: "Exam not found" });
-      }
-
-      const attempt = await prisma.examAttempt.findFirst({
-        where: { userId: student.id, examId },
-        orderBy: { retakeNumber: "desc" },
-      });
-
-      if (!attempt) {
-        return res.status(400).json({ error: "No attempt found for this exam" });
-      }
-
-      if (attempt.status === "DISQUALIFIED") {
-        return res
-          .status(403)
-          .json({ error: "This attempt has been disqualified" });
-      }
-
-      if (attempt.status === "COMPLETED") {
-        return res.status(400).json({
-          error: "This exam has already been submitted",
-          score: attempt.score,
-        });
-      }
-
-      if (attempt.status !== "IN_PROGRESS") {
-        return res
-          .status(400)
-          .json({ error: "Exam must be in progress to submit" });
-      }
+      const session = await openSession(_req, res, examId, "submit");
+      if (!session) return;
+      const { attempt, now } = session;
+      // openSession already enforced exam existence and an in-progress attempt.
+      if (!attempt) return;
 
       const questions = await prisma.question.findMany({
         where: { examId, deletedAt: null },
