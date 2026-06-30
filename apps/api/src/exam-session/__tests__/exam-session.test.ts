@@ -1,0 +1,187 @@
+import { test, expect } from "bun:test";
+import { evaluateSession } from "../exam-session.ts";
+import type { ExamSnapshot, AttemptSnapshot } from "../exam-session.ts";
+
+const NOW = new Date("2026-01-01T12:00:00Z");
+
+function exam(over: Partial<ExamSnapshot> = {}): ExamSnapshot {
+  return {
+    id: "e1",
+    title: "Algorithms",
+    description: null,
+    startTime: new Date("2026-01-01T00:00:00Z"),
+    endTime: new Date("2026-01-02T00:00:00Z"),
+    durationMin: 60,
+    isActive: true,
+    deletedAt: null,
+    eligibilities: [],
+    ...over,
+  };
+}
+
+function attempt(over: Partial<AttemptSnapshot> = {}): AttemptSnapshot {
+  return {
+    id: "a1",
+    status: "IN_PROGRESS",
+    startedAt: NOW,
+    completedAt: null,
+    retakeNumber: 0,
+    score: null,
+    ipAddress: null,
+    ...over,
+  };
+}
+
+const student = { batchId: "b1", departmentId: "d1" };
+
+test("enter: an eligible student of a live, in-window exam with no prior attempt is admitted", () => {
+  const result = evaluateSession("enter", {
+    exam: exam(),
+    attempt: null,
+    student,
+    now: NOW,
+  });
+  expect(result.ok).toBe(true);
+});
+
+test("enter: a missing exam is a not-found refusal", () => {
+  const result = evaluateSession("enter", {
+    exam: null,
+    attempt: null,
+    student,
+    now: NOW,
+  });
+  expect(result).toEqual({
+    ok: false,
+    status: 404,
+    error: "Exam not found",
+    code: "EXAM_NOT_FOUND",
+  });
+});
+
+test("enter: a soft-deleted exam is a not-found refusal", () => {
+  const result = evaluateSession("enter", {
+    exam: exam({ deletedAt: new Date("2026-01-01T01:00:00Z") }),
+    attempt: null,
+    student,
+    now: NOW,
+  });
+  expect(result).toEqual({
+    ok: false,
+    status: 404,
+    error: "Exam not found",
+    code: "EXAM_NOT_FOUND",
+  });
+});
+
+test("enter: a student outside the exam's eligibility is refused", () => {
+  const result = evaluateSession("enter", {
+    exam: exam({ eligibilities: [{ batchId: "other-batch", departmentId: null }] }),
+    attempt: null,
+    student,
+    now: NOW,
+  });
+  expect(result).toEqual({
+    ok: false,
+    status: 403,
+    error: "You are not eligible to enter this exam room",
+    code: "INELIGIBLE",
+  });
+});
+
+test("enter: a student matching an eligibility batch is admitted", () => {
+  const result = evaluateSession("enter", {
+    exam: exam({ eligibilities: [{ batchId: "b1", departmentId: null }] }),
+    attempt: null,
+    student,
+    now: NOW,
+  });
+  expect(result.ok).toBe(true);
+});
+
+test("enter: an exam that is not live is refused", () => {
+  const result = evaluateSession("enter", {
+    exam: exam({ isActive: false }),
+    attempt: null,
+    student,
+    now: NOW,
+  });
+  expect(result).toEqual({
+    ok: false,
+    status: 400,
+    error: "This exam is not live right now",
+    code: "NOT_ACTIVE",
+  });
+});
+
+test("enter: an exam before its start time is refused", () => {
+  const result = evaluateSession("enter", {
+    exam: exam({ startTime: new Date("2026-01-01T18:00:00Z") }),
+    attempt: null,
+    student,
+    now: NOW,
+  });
+  expect(result).toEqual({
+    ok: false,
+    status: 400,
+    error: "This exam has not started yet",
+    code: "NOT_STARTED",
+  });
+});
+
+test("enter: an exam past its end time is refused", () => {
+  const result = evaluateSession("enter", {
+    exam: exam({ endTime: new Date("2026-01-01T06:00:00Z") }),
+    attempt: null,
+    student,
+    now: NOW,
+  });
+  expect(result).toEqual({
+    ok: false,
+    status: 400,
+    error: "This exam has already ended",
+    code: "ENDED",
+  });
+});
+
+test("enter: a student who already completed the exam is refused", () => {
+  const result = evaluateSession("enter", {
+    exam: exam(),
+    attempt: attempt({ status: "COMPLETED" }),
+    student,
+    now: NOW,
+  });
+  expect(result).toEqual({
+    ok: false,
+    status: 400,
+    error: "You have already submitted this exam",
+    code: "ALREADY_SUBMITTED",
+  });
+});
+
+test("enter: a disqualified student is refused", () => {
+  const result = evaluateSession("enter", {
+    exam: exam(),
+    attempt: attempt({ status: "DISQUALIFIED" }),
+    student,
+    now: NOW,
+  });
+  expect(result).toEqual({
+    ok: false,
+    status: 403,
+    error: "Your exam attempt has been disqualified",
+    code: "DISQUALIFIED",
+  });
+});
+
+test("enter: a student with an in-progress attempt is admitted to resume it", () => {
+  const inProgress = attempt({ status: "IN_PROGRESS" });
+  const result = evaluateSession("enter", {
+    exam: exam(),
+    attempt: inProgress,
+    student,
+    now: NOW,
+  });
+  expect(result.ok).toBe(true);
+  if (result.ok) expect(result.attempt).toEqual(inProgress);
+});
