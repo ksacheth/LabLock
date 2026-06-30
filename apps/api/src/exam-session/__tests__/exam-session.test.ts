@@ -292,3 +292,129 @@ test("run: an in-progress student in an open window is admitted", () => {
   });
   expect(result.ok).toBe(true);
 });
+
+// ─── submit: no window check, resubmit carries score, status matrix (#25) ─────
+
+test("submit: an in-progress attempt may submit even after the window closed", () => {
+  const result = evaluateSession("submit", {
+    exam: exam({ endTime: new Date("2026-01-01T06:00:00Z") }), // already ended
+    attempt: attempt({ status: "IN_PROGRESS" }),
+    student,
+    now: NOW,
+  });
+  expect(result.ok).toBe(true);
+});
+
+test("submit: a missing exam is a not-found refusal", () => {
+  const result = evaluateSession("submit", {
+    exam: null,
+    attempt: attempt({ status: "IN_PROGRESS" }),
+    student,
+    now: NOW,
+  });
+  expect(result).toEqual({
+    ok: false,
+    status: 404,
+    error: "Exam not found",
+    code: "EXAM_NOT_FOUND",
+  });
+});
+
+test("submit: no attempt is a 400", () => {
+  const result = evaluateSession("submit", {
+    exam: exam(),
+    attempt: null,
+    student,
+    now: NOW,
+  });
+  expect(result).toEqual({
+    ok: false,
+    status: 400,
+    error: "No attempt found for this exam",
+    code: "NO_ATTEMPT",
+  });
+});
+
+test("submit: a disqualified attempt is a 403", () => {
+  const result = evaluateSession("submit", {
+    exam: exam(),
+    attempt: attempt({ status: "DISQUALIFIED" }),
+    student,
+    now: NOW,
+  });
+  expect(result).toEqual({
+    ok: false,
+    status: 403,
+    error: "This attempt has been disqualified",
+    code: "DISQUALIFIED",
+  });
+});
+
+test("submit: resubmitting a completed exam returns the score in details", () => {
+  const result = evaluateSession("submit", {
+    exam: exam(),
+    attempt: attempt({ status: "COMPLETED", score: 42 }),
+    student,
+    now: NOW,
+  });
+  expect(result).toEqual({
+    ok: false,
+    status: 400,
+    error: "This exam has already been submitted",
+    code: "ALREADY_SUBMITTED",
+    details: { score: 42 },
+  });
+});
+
+test("submit: an attempt that is neither in-progress nor terminal must be in progress", () => {
+  const result = evaluateSession("submit", {
+    exam: exam(),
+    attempt: attempt({ status: "ENROLLED" }),
+    student,
+    now: NOW,
+  });
+  expect(result).toEqual({
+    ok: false,
+    status: 400,
+    error: "Exam must be in progress to submit",
+    code: "NOT_IN_PROGRESS",
+  });
+});
+
+// ─── violation: no exam, no window, just an in-progress attempt (#25) ─────────
+
+test("violation: an in-progress attempt is admitted with no exam loaded", () => {
+  const result = evaluateSession("violation", {
+    exam: null,
+    attempt: attempt({ status: "IN_PROGRESS" }),
+    student,
+    now: NOW,
+  });
+  expect(result.ok).toBe(true);
+});
+
+test("violation: no in-progress attempt is a 404", () => {
+  const result = evaluateSession("violation", {
+    exam: null,
+    attempt: null,
+    student,
+    now: NOW,
+  });
+  expect(result).toEqual({
+    ok: false,
+    status: 404,
+    error: "No active IN_PROGRESS attempt found",
+    code: "NO_ACTIVE_ATTEMPT",
+  });
+});
+
+test("violation: a completed attempt is not active", () => {
+  const result = evaluateSession("violation", {
+    exam: null,
+    attempt: attempt({ status: "COMPLETED" }),
+    student,
+    now: NOW,
+  });
+  expect(result.ok).toBe(false);
+  if (!result.ok) expect(result.code).toBe("NO_ACTIVE_ATTEMPT");
+});
