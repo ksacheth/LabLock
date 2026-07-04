@@ -196,12 +196,12 @@ function ExamEditor() {
   const handleSaveQuestion = async () => {
     if (!title || !description) {
       setSaveError("Title and description are required.");
-      return;
+      return false;
     }
     const preparedTestCases = prepareTestCasesForSave(testCases);
     if ("error" in preparedTestCases) {
       setSaveError(preparedTestCases.error);
-      return;
+      return false;
     }
 
     const validTestCases = preparedTestCases.testCases;
@@ -291,6 +291,7 @@ function ExamEditor() {
       await fetchQuestions();
       setSaveSuccess(true);
       setTimeout(() => setSaveSuccess(false), 3000);
+      return true;
     } catch (error) {
       console.error("Failed to save question", error);
       if (axios.isAxiosError(error)) {
@@ -308,6 +309,7 @@ function ExamEditor() {
       } else {
         setSaveError("Failed to save question.");
       }
+      return false;
     } finally {
       setSaving(false);
     }
@@ -366,15 +368,12 @@ function ExamEditor() {
             Exam Navigation
           </h3>
           <nav className="flex flex-col gap-1">
-            <a
-              className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-500 hover:bg-primary/5 transition-all group"
-              href="#"
-            >
-              <span className="material-symbols-outlined text-slate-400 group-hover:text-primary">
+            <div className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-500">
+              <span className="material-symbols-outlined text-slate-400">
                 settings
               </span>
               <span className="text-sm font-medium">Exam Settings</span>
-            </a>
+            </div>
 
             <div className="my-2 border-t border-primary/5"></div>
 
@@ -483,10 +482,15 @@ function ExamEditor() {
               </div>
               <div className="flex gap-3">
                 <button
-                  onClick={() => router.push("/teacher/dashboard")}
-                  className="px-6 py-2.5 rounded-lg border border-primary/20 text-primary font-bold text-sm hover:bg-primary/5 transition-colors"
+                  onClick={async () => {
+                    if (await handleSaveQuestion()) {
+                      router.push("/teacher/dashboard");
+                    }
+                  }}
+                  disabled={saving}
+                  className="px-6 py-2.5 rounded-lg border border-primary/20 text-primary font-bold text-sm hover:bg-primary/5 transition-colors disabled:opacity-70"
                 >
-                  Save Draft
+                  {saving ? "Saving..." : "Save Draft"}
                 </button>
                 <button
                   onClick={handlePublish}

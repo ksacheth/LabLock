@@ -70,7 +70,7 @@ int main() {
     return 0;
 }
 `,
-  CPP: `#include <bits/stdc++.h>
+  CPP: `#include <iostream>
 using namespace std;
 
 int main() {

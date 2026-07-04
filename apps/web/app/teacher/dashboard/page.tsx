@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import axios, { AxiosError } from "axios";
 
@@ -439,43 +440,43 @@ export default function TeacherDashboard() {
           </div>
         </div>
         <nav className="flex-1 px-4 space-y-1">
-          <a
+          <Link
             className="flex items-center gap-3 px-3 py-2 rounded-lg bg-primary/10 text-primary font-medium"
-            href="#"
+            href="/teacher/dashboard"
           >
             <span className="material-symbols-outlined">dashboard</span>
             <span>Dashboard</span>
-          </a>
-          <a
+          </Link>
+          <Link
             className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-primary/5 text-slate-600 dark:text-slate-400 font-medium"
-            href="#"
+            href="/teacher/dashboard#drafts"
           >
             <span className="material-symbols-outlined">description</span>
             <span>Drafts</span>
-          </a>
-          <a
+          </Link>
+          <Link
             className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-primary/5 text-slate-600 dark:text-slate-400 font-medium"
-            href="#"
+            href="/teacher/dashboard#live-sessions"
           >
             <span className="material-symbols-outlined">podcasts</span>
             <span>Live Sessions</span>
-          </a>
-          <a
+          </Link>
+          <Link
             className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-primary/5 text-slate-600 dark:text-slate-400 font-medium"
-            href="#"
+            href="/teacher/results"
           >
             <span className="material-symbols-outlined">analytics</span>
             <span>Results</span>
-          </a>
+          </Link>
         </nav>
         <div className="p-4 border-t border-primary/10">
-          <a
+          <Link
             className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-primary/5 text-slate-600 dark:text-slate-400 font-medium"
-            href="#"
+            href="/teacher/settings"
           >
             <span className="material-symbols-outlined">settings</span>
             <span>Settings</span>
-          </a>
+          </Link>
           <div className="mt-4 flex items-center justify-between px-3 py-2 bg-slate-50 dark:bg-slate-800/50 rounded-lg border border-primary/5">
             <div className="flex items-center gap-3 overflow-hidden">
               <div className="h-8 w-8 shrink-0 rounded-full bg-secondary/30 flex items-center justify-center text-primary font-bold text-sm">
@@ -722,7 +723,10 @@ export default function TeacherDashboard() {
               </section>
 
               {/* Host Exam Section (Drafts) */}
-              <section className="bg-white dark:bg-slate-800 rounded-xl border border-primary/10 shadow-md overflow-hidden flex flex-col">
+              <section
+                id="drafts"
+                className="bg-white dark:bg-slate-800 rounded-xl border border-primary/10 shadow-md overflow-hidden flex flex-col"
+              >
                 <div className="p-6 border-b border-primary/5 bg-secondary/5">
                   <h3 className="text-lg font-bold text-primary flex items-center gap-2">
                     <span className="material-symbols-outlined">
@@ -792,18 +796,11 @@ export default function TeacherDashboard() {
                     )}
                   </div>
                 </div>
-                {drafts > 0 && (
-                  <div className="p-4 bg-slate-50 dark:bg-slate-900 text-center border-t border-primary/5">
-                    <button className="text-secondary text-sm font-bold hover:underline">
-                      View all {drafts} drafts
-                    </button>
-                  </div>
-                )}
               </section>
             </div>
 
             {/* Recent Activity */}
-            <div className="mt-10">
+            <div id="live-sessions" className="mt-10">
               <h3 className="text-xl font-bold text-primary mb-4 px-1">
                 Active Exam Sessions
               </h3>
