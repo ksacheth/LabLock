@@ -13,6 +13,23 @@ import {
   FACULTY_PENDING_APPROVAL,
 } from "../authorization/authorize.ts";
 
+// Sends the uniform "invalid credentials" response for a failed signin, and
+// consumes one login rate-limit attempt (brute-force defense — only failures
+// count). Kept out of the signin handler to hold its complexity down.
+function rejectInvalidLogin(
+  req: Request,
+  res: Response,
+  user: { id: string } | null,
+  email: string,
+) {
+  if (!rateLimitRequest(req, res, "login")) return; // over the limit → 429 sent
+  logApiEvent("auth.signin.denied", {
+    reason: user ? "invalid_password" : "user_not_found",
+    ...(user ? { userId: user.id } : { email }),
+  });
+  res.status(400).json({ error: "Invalid credentials" });
+}
+
 export function registerAuthRoutes(app: Express) {
 app.post("/api/signup", async (_req: Request, res: Response) => {
   const result = UserSchema.safeParse(_req.body);
@@ -151,24 +168,11 @@ app.post("/api/signin", async (_req: Request, res: Response) => {
 
   try {
     const user = await prisma.user.findUnique({ where: { email } });
-    if (!user) {
-      // Brute-force defense: only failed attempts consume the login window.
-      if (!rateLimitRequest(_req, res, "login")) return;
-      logApiEvent("auth.signin.denied", {
-        reason: "user_not_found",
-        email,
-      });
-      return res.status(400).json({ error: "Invalid credentials" });
-    }
-
-    const isPasswordValid = await bcrypt.compare(password, user.password);
-    if (!isPasswordValid) {
-      if (!rateLimitRequest(_req, res, "login")) return;
-      logApiEvent("auth.signin.denied", {
-        reason: "invalid_password",
-        userId: user.id,
-      });
-      return res.status(400).json({ error: "Invalid credentials" });
+    const isPasswordValid = user
+      ? await bcrypt.compare(password, user.password)
+      : false;
+    if (!user || !isPasswordValid) {
+      return rejectInvalidLogin(_req, res, user, email);
     }
 
     if (user.role === "FACULTY" && !user.facultyApproved) {
