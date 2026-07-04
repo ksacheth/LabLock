@@ -1,0 +1,47 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  # Lint + typecheck + the fast (Docker-free) unit tests for the API. Scoped to
+  # apps/api: this is the workspace the sandbox seam lives in, and the root
+  # `turbo run lint` also gates the frontend on unrelated pre-existing warnings.
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.9
+      - run: bun install --frozen-lockfile
+      - run: bun run lint
+        working-directory: apps/api
+      - run: bun run check-types
+        working-directory: apps/api
+      - name: Unit tests
+        run: bun test
+        working-directory: apps/api
+
+  # The sandbox isolation suite MUST run against the real image (ADR-0006). This
+  # job builds the pinned toolchain image and runs the Docker-gated escape-attempt
+  # tests with SANDBOX_TESTS=required, so the suite hard-fails if it cannot run —
+  # a skipped isolation test is a non-test.
+  sandbox-isolation:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.9
+      - run: bun install --frozen-lockfile
+      - name: Build the sandbox image (pinned toolchain + harness)
+        run: docker build -t labproctor-sandbox:ci apps/api/sandbox
+      - name: Run the isolation escape-attempt suite (mandatory)
+        run: bun test src/execution/__tests__/sandbox-runner.test.ts
+        working-directory: apps/api
+        env:
+          SANDBOX_TESTS: required
+          SANDBOX_IMAGE: labproctor-sandbox:ci
