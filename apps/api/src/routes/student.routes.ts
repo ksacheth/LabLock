@@ -5,10 +5,14 @@ import { isStudentProgrammingLanguage, toStudentProgrammingLanguage } from "../t
 import type { ExecutionSubmissionStatus, StudentVisibleTestCase } from "../types.ts";
 import { calculateWeightedQuestionScore } from "../lib/scoring.ts";
 import { logApiEvent } from "../lib/logging.ts";
-import { judge } from "../execution/judge.ts";
+import {
+  judge,
+  formatExecutionInputForCompetitiveProgramming,
+} from "../execution/judge.ts";
 import { upsertStudentSubmissionRecord } from "../lib/submissions.ts";
 import { authorizeRequest } from "../authorization/authorize-request.ts";
 import { openSession } from "../exam-session/open-session.ts";
+import { rateLimitRequest } from "../rate-limit/rate-limit-request.ts";
 
 export function registerStudentRoutes(app: Express) {
 app.post(
@@ -62,6 +66,11 @@ app.post(
           orderIndex: true,
           timeLimitMs: true,
           memoryLimitKb: true,
+          testCases: {
+            where: { isHidden: false },
+            orderBy: { id: "asc" },
+            select: { input: true, expectedOutput: true },
+          },
           submissions: {
             where: {
               attemptId: attempt.id,
@@ -102,6 +111,14 @@ app.post(
             orderIndex: question.orderIndex,
             timeLimitMs: question.timeLimitMs,
             memoryLimitKb: question.memoryLimitKb,
+            // Sample (non-hidden) cases, with input expanded to the exact stdin
+            // the runner feeds the program — so students see the real format.
+            samples: question.testCases.map((testCase) => ({
+              input: formatExecutionInputForCompetitiveProgramming(
+                testCase.input,
+              ),
+              expectedOutput: testCase.expectedOutput,
+            })),
             draft: question.submissions[0] ?? null,
           })),
         },
@@ -330,6 +347,8 @@ app.post(
 
       const student = await authorizeRequest(_req, res, "student:run");
       if (!student) return;
+
+      if (!rateLimitRequest(_req, res, "run")) return;
 
       const session = await openSession(_req, res, examId, "run");
       if (!session) return;
