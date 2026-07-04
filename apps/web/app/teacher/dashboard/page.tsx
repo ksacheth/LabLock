@@ -4,16 +4,11 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import axios, { AxiosError } from "axios";
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
-const REQUIRED_ROLE = "FACULTY";
-
-function getDashboardPathForRole(role: string) {
-  if (role === "STUDENT") return "/student/dashboard";
-  if (role === "FACULTY") return "/teacher/dashboard";
-  if (role === "ADMIN") return "/admin/dashboard";
-  return "/auth";
-}
+import {
+  API_URL,
+  TEACHER_REQUIRED_ROLE as REQUIRED_ROLE,
+  getDashboardPathForRole,
+} from "../../lib/auth";
 
 interface User {
   id: string;
