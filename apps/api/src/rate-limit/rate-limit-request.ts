@@ -29,7 +29,12 @@ function rateLimitRequest(
 ): boolean {
   try {
     const policy = POLICIES[policyName];
-    const ctx: KeyContext = { userId: req.userId ?? undefined };
+    const body = req.body as { email?: unknown } | undefined;
+    const ctx: KeyContext = {
+      userId: req.userId ?? undefined,
+      ip: typeof req.ip === "string" ? req.ip : undefined,
+      email: typeof body?.email === "string" ? body.email : undefined,
+    };
     const key = policy.key(ctx);
     const now = new Date();
 

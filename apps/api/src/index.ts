@@ -17,6 +17,19 @@ import { registerStudentRoutes } from "./routes/student.routes.ts";
 const app: Express = express();
 const PORT = process.env.PORT ?? 4000;
 
+// Behind a proxy/load balancer, `req.ip` must reflect the client (not the proxy)
+// or the login rate-limit IP key collapses. Configure per deployment via
+// TRUST_PROXY: "true", a hop count ("1"), or a subnet string. Default off — no
+// proxy (e.g. local dev), where req.ip is already the client. See ADR-0005.
+const trustProxy = process.env.TRUST_PROXY;
+if (trustProxy && trustProxy !== "false") {
+  const hops = Number(trustProxy);
+  app.set(
+    "trust proxy",
+    trustProxy === "true" ? true : Number.isNaN(hops) ? trustProxy : hops,
+  );
+}
+
 // ─── Global Middleware ──────────────────────────────────────────────────────
 app.use(cors({ origin: process.env.CORS_ORIGIN ?? "http://localhost:3000" }));
 app.use(express.json());
