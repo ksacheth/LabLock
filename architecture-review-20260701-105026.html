@@ -1,0 +1,349 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Architecture review — LabLock</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script type="module">
+      import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs";
+      mermaid.initialize({ startOnLoad: true, theme: "neutral", securityLevel: "loose" });
+    </script>
+    <style>
+      .seam { stroke-dasharray: 5 4; }
+      .deep { background: linear-gradient(135deg, #0f172a, #1e293b); }
+      .shallow-band { background: repeating-linear-gradient(135deg,#f1f5f9,#f1f5f9 8px,#e2e8f0 8px,#e2e8f0 16px); }
+      .arrow-red { stroke:#dc2626; stroke-width:2; marker-end:url(#redhead); }
+      pre.mermaid { line-height: 1.2; }
+      .card-anchor { scroll-margin-top: 1.5rem; }
+    </style>
+  </head>
+  <body class="bg-stone-50 text-slate-900 font-sans antialiased">
+    <svg width="0" height="0" class="absolute">
+      <defs>
+        <marker id="redhead" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto">
+          <path d="M0,0 L7,3 L0,6 Z" fill="#dc2626" />
+        </marker>
+        <marker id="darkhead" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto">
+          <path d="M0,0 L7,3 L0,6 Z" fill="#0f172a" />
+        </marker>
+      </defs>
+    </svg>
+
+    <main class="max-w-5xl mx-auto px-6 py-12 space-y-14">
+      <!-- ─── Header ─────────────────────────────────────────────────────── -->
+      <header class="space-y-5">
+        <div class="flex items-baseline justify-between flex-wrap gap-3">
+          <h1 class="text-4xl font-serif font-bold tracking-tight">
+            Architecture review — <span class="text-indigo-700">LabLock</span>
+          </h1>
+          <p class="text-sm text-slate-500 font-mono">2026-07-01</p>
+        </div>
+        <p class="text-slate-600 max-w-3xl">
+          Four deepening opportunities. The domain core (Judge, authorize, ExamSession)
+          is already deep and behind clean seams. The friction is one layer up — where
+          <em>orchestration</em> that ties those deep parts together sits inline in handlers
+          and components, with no seam and no test surface.
+        </p>
+        <!-- legend -->
+        <div class="flex flex-wrap gap-5 text-xs uppercase tracking-wider text-slate-500 border-y border-slate-200 py-3">
+          <span class="flex items-center gap-2"><span class="inline-block w-6 h-4 border border-slate-400 bg-white"></span> module</span>
+          <span class="flex items-center gap-2"><svg width="26" height="8"><line x1="0" y1="4" x2="26" y2="4" class="seam" stroke="#64748b" stroke-width="2"/></svg> seam</span>
+          <span class="flex items-center gap-2"><svg width="26" height="8"><line x1="0" y1="4" x2="22" y2="4" class="arrow-red"/></svg> leakage</span>
+          <span class="flex items-center gap-2"><span class="inline-block w-6 h-4 deep rounded-sm"></span> deep module</span>
+        </div>
+      </header>
+
+      <!-- ─── Candidates ─────────────────────────────────────────────────── -->
+      <section id="candidates" class="space-y-16">
+
+        <!-- ============================================================== -->
+        <!-- CANDIDATE 1 — Grade the Attempt                                -->
+        <!-- ============================================================== -->
+        <article id="c1" class="card-anchor space-y-6">
+          <div class="flex items-start justify-between gap-4 flex-wrap">
+            <h2 class="text-2xl font-serif font-semibold">1 · Collapse the submit loop into a Grading module</h2>
+            <div class="flex gap-2 shrink-0">
+              <span class="text-xs font-bold uppercase tracking-wider px-3 py-1 rounded-full bg-emerald-100 text-emerald-800">Strong</span>
+              <span class="text-xs font-mono px-3 py-1 rounded-full bg-slate-100 text-slate-600">in-process</span>
+            </div>
+          </div>
+
+          <p class="font-mono text-sm text-slate-500">
+            apps/api/src/routes/student.routes.ts&nbsp;·&nbsp;submit&nbsp;(450–641)&nbsp;+&nbsp;run&nbsp;(304–448)&nbsp;→&nbsp;lib/scoring.ts&nbsp;·&nbsp;lib/submissions.ts&nbsp;·&nbsp;execution/judge.ts
+          </p>
+
+          <!-- before / after -->
+          <div class="grid md:grid-cols-2 gap-4">
+            <!-- BEFORE: call-graph inside one handler -->
+            <div class="rounded-lg border border-slate-200 bg-white p-4">
+              <p class="text-xs uppercase tracking-wider text-slate-400 mb-3">Before — 190-line handler</p>
+              <div class="border-2 border-red-300 rounded-md p-3 bg-red-50/40">
+                <p class="text-xs uppercase tracking-wider text-red-500 mb-2 font-semibold">submit handler</p>
+                <div class="space-y-1.5 text-[11px] font-mono">
+                  <div class="pl-0 text-slate-700">load questions</div>
+                  <div class="pl-2 text-slate-700">for each question ↓</div>
+                  <div class="pl-5 border-l-2 border-slate-300 text-slate-600">load latest submission</div>
+                  <div class="pl-5 border-l-2 border-slate-300 text-slate-600">load test cases</div>
+                  <div class="pl-5 border-l-2 border-slate-300 text-indigo-700">→ judge()</div>
+                  <div class="pl-5 border-l-2 border-slate-300 text-indigo-700">→ calculateWeightedQuestionScore()</div>
+                  <div class="pl-5 border-l-2 border-slate-300 text-indigo-700">→ upsertStudentSubmissionRecord()</div>
+                  <div class="pl-5 border-l-2 border-slate-300 text-slate-600">PENDING / SYSTEM_ERROR branch</div>
+                  <div class="pl-5 border-l-2 border-slate-300 text-slate-600">push breakdown row, round</div>
+                  <div class="pl-0 text-slate-700">sum + complete attempt (write)</div>
+                </div>
+              </div>
+              <p class="mt-3 text-[11px] text-slate-500 italic">run handler repeats judge → upsert → shape response.</p>
+            </div>
+
+            <!-- AFTER: one deep module -->
+            <div class="rounded-lg border border-slate-200 bg-white p-4">
+              <p class="text-xs uppercase tracking-wider text-slate-400 mb-3">After — deep Grading module</p>
+              <div class="deep rounded-md p-3 text-slate-100">
+                <p class="text-[11px] uppercase tracking-wider text-emerald-300 mb-2 font-semibold">gradeAttempt(exam, attempt, deps)</p>
+                <p class="text-[11px] font-mono text-slate-400 mb-3">→ GradeReport { totalScore, breakdown }</p>
+                <div class="space-y-1.5 text-[11px] font-mono text-slate-500 border-t border-white/10 pt-2">
+                  <div>gradeQuestion() &nbsp;<span class="text-slate-600">(internal)</span></div>
+                  <div class="opacity-60">judge · score · persist &nbsp;<span class="text-slate-600">(injected)</span></div>
+                  <div class="opacity-60">PENDING / SYSTEM_ERROR rows</div>
+                </div>
+              </div>
+              <div class="mt-3 flex items-center gap-2 text-[11px] font-mono text-slate-500">
+                <span class="px-2 py-0.5 rounded bg-slate-100">run handler</span>
+                <span>→ gradeQuestion()</span>
+              </div>
+              <p class="mt-2 text-[11px] text-slate-500 italic">Handlers load I/O, call one interface, write the response.</p>
+            </div>
+          </div>
+
+          <div class="grid md:grid-cols-2 gap-x-8 gap-y-3 text-sm">
+            <p><span class="font-semibold">Problem.</span> The submit handler is a Brain Method — judge, score, persist and the SYSTEM_ERROR/PENDING policy are interleaved in one loop; run duplicates half of it.</p>
+            <p><span class="font-semibold">Solution.</span> A <code class="text-indigo-700">gradeAttempt</code> module owning the per-question grading orchestration; judge and persistence pass in as dependencies.</p>
+          </div>
+
+          <ul class="grid sm:grid-cols-2 gap-x-8 gap-y-1.5 text-sm text-slate-700 list-disc pl-5">
+            <li>locality: SYSTEM_ERROR quarantine lives in one module</li>
+            <li>leverage: run and submit share <code>gradeQuestion</code></li>
+            <li>interface is the test surface — no Express, no Prisma</li>
+            <li>interface shrinks; handler absorbs only I/O</li>
+          </ul>
+
+          <div class="rounded-md bg-amber-50 border border-amber-200 px-4 py-2.5 text-sm text-amber-900">
+            <span class="font-semibold">ADR-0004 note.</span> Complements it — ExamSession stays read-only; the attempt-completion write moves into a <em>distinct</em> grading module, not into <code>openSession</code>.
+          </div>
+        </article>
+
+        <!-- ============================================================== -->
+        <!-- CANDIDATE 2 — Authenticated client                             -->
+        <!-- ============================================================== -->
+        <article id="c2" class="card-anchor space-y-6">
+          <div class="flex items-start justify-between gap-4 flex-wrap">
+            <h2 class="text-2xl font-serif font-semibold">2 · One authenticated client for the web app</h2>
+            <div class="flex gap-2 shrink-0">
+              <span class="text-xs font-bold uppercase tracking-wider px-3 py-1 rounded-full bg-emerald-100 text-emerald-800">Strong</span>
+              <span class="text-xs font-mono px-3 py-1 rounded-full bg-slate-100 text-slate-600">local-substitutable</span>
+            </div>
+          </div>
+
+          <p class="font-mono text-sm text-slate-500">
+            apps/web/app/student/dashboard/page.tsx&nbsp;·&nbsp;student/exams/[examId]/page.tsx&nbsp;·&nbsp;teacher/results/page.tsx&nbsp;·&nbsp;teacher/*&nbsp;·&nbsp;admin/*
+          </p>
+
+          <!-- before/after: mass diagram — interface repeated per page vs one deep client -->
+          <div class="grid md:grid-cols-2 gap-4">
+            <div class="rounded-lg border border-slate-200 bg-white p-4">
+              <p class="text-xs uppercase tracking-wider text-slate-400 mb-3">Before — every page reimplements the interface</p>
+              <div class="space-y-2">
+                <!-- each page = its own copy of the same boilerplate -->
+                <div class="grid grid-cols-4 gap-2">
+                  <div class="col-span-4 grid grid-cols-4 gap-2">
+                    <div class="shallow-band border border-slate-300 rounded p-1.5 text-[9px] text-center text-slate-600 leading-tight">student<br/>dashboard</div>
+                    <div class="shallow-band border border-slate-300 rounded p-1.5 text-[9px] text-center text-slate-600 leading-tight">exam<br/>room</div>
+                    <div class="shallow-band border border-slate-300 rounded p-1.5 text-[9px] text-center text-slate-600 leading-tight">teacher<br/>results</div>
+                    <div class="shallow-band border border-slate-300 rounded p-1.5 text-[9px] text-center text-slate-600 leading-tight">admin<br/>dash</div>
+                  </div>
+                </div>
+                <div class="rounded border border-red-200 bg-red-50/50 p-2 text-[10px] font-mono text-red-700 space-y-0.5">
+                  <div>× getToken()&nbsp;&nbsp;× API_URL</div>
+                  <div>× Authorization: Bearer ${token}</div>
+                  <div>× getDashboardPathForRole()</div>
+                  <div>× /api/me role-check + redirect</div>
+                </div>
+                <p class="text-[11px] text-slate-500 italic">Copied verbatim into each page. No test surface.</p>
+              </div>
+            </div>
+
+            <div class="rounded-lg border border-slate-200 bg-white p-4">
+              <p class="text-xs uppercase tracking-wider text-slate-400 mb-3">After — pages depend on one interface</p>
+              <div class="grid grid-cols-4 gap-2 mb-3">
+                <div class="border border-slate-300 rounded p-1.5 text-[9px] text-center text-slate-700 bg-white leading-tight">student<br/>dashboard</div>
+                <div class="border border-slate-300 rounded p-1.5 text-[9px] text-center text-slate-700 bg-white leading-tight">exam<br/>room</div>
+                <div class="border border-slate-300 rounded p-1.5 text-[9px] text-center text-slate-700 bg-white leading-tight">teacher<br/>results</div>
+                <div class="border border-slate-300 rounded p-1.5 text-[9px] text-center text-slate-700 bg-white leading-tight">admin<br/>dash</div>
+              </div>
+              <svg width="100%" height="20"><line x1="12%" y1="0" x2="50%" y2="20" class="seam" stroke="#64748b" stroke-width="1.5"/><line x1="37%" y1="0" x2="50%" y2="20" class="seam" stroke="#64748b" stroke-width="1.5"/><line x1="63%" y1="0" x2="50%" y2="20" class="seam" stroke="#64748b" stroke-width="1.5"/><line x1="88%" y1="0" x2="50%" y2="20" class="seam" stroke="#64748b" stroke-width="1.5"/></svg>
+              <div class="deep rounded-md p-3 text-slate-100">
+                <p class="text-[11px] uppercase tracking-wider text-emerald-300 mb-1 font-semibold">lablockClient</p>
+                <p class="text-[10px] font-mono text-slate-400 leading-relaxed">getExams() · enterExamRoom() · runCode()<br/>submitExam() · getResults()</p>
+                <p class="text-[10px] font-mono text-slate-500 mt-2 border-t border-white/10 pt-1.5">owns base URL · token header · error unwrap</p>
+              </div>
+              <p class="mt-2 text-[11px] font-mono text-slate-500">+ useAuthenticatedRole(role) hook owns the /api/me guard</p>
+            </div>
+          </div>
+
+          <div class="grid md:grid-cols-2 gap-x-8 gap-y-3 text-sm">
+            <p><span class="font-semibold">Problem.</span> Token read, base URL, auth header, and the role-guard <code>useEffect</code> are copy-pasted into every page — a shallow interface, N implementations.</p>
+            <p><span class="font-semibold">Solution.</span> A typed <code class="text-indigo-700">lablockClient</code> plus a <code class="text-indigo-700">useAuthenticatedRole</code> hook; pages call methods, never construct headers.</p>
+          </div>
+
+          <ul class="grid sm:grid-cols-2 gap-x-8 gap-y-1.5 text-sm text-slate-700 list-disc pl-5">
+            <li>leverage: one interface, ~6 call sites</li>
+            <li>locality: token handling in one place</li>
+            <li>test surface where there is none today</li>
+            <li>delete ~5 duplicated helpers per page</li>
+          </ul>
+        </article>
+
+        <!-- ============================================================== -->
+        <!-- CANDIDATE 3 — Editor text engine                               -->
+        <!-- ============================================================== -->
+        <article id="c3" class="card-anchor space-y-6">
+          <div class="flex items-start justify-between gap-4 flex-wrap">
+            <h2 class="text-2xl font-serif font-semibold">3 · Lift the editor-text engine out of the 1830-line room</h2>
+            <div class="flex gap-2 shrink-0">
+              <span class="text-xs font-bold uppercase tracking-wider px-3 py-1 rounded-full bg-amber-100 text-amber-800">Worth exploring</span>
+              <span class="text-xs font-mono px-3 py-1 rounded-full bg-slate-100 text-slate-600">in-process</span>
+            </div>
+          </div>
+
+          <p class="font-mono text-sm text-slate-500">
+            apps/web/app/student/exams/[examId]/page.tsx&nbsp;(1830&nbsp;lines)
+          </p>
+
+          <!-- cross-section: the file today -->
+          <div class="grid md:grid-cols-2 gap-4">
+            <div class="rounded-lg border border-slate-200 bg-white p-4">
+              <p class="text-xs uppercase tracking-wider text-slate-400 mb-3">Before — one file, five concerns</p>
+              <div class="space-y-1">
+                <div class="h-9 border-l-4 border-indigo-400 bg-indigo-50 pl-2 flex items-center text-[11px] font-mono text-slate-700">syntax highlighter · ~230 lines pure</div>
+                <div class="h-9 border-l-4 border-indigo-400 bg-indigo-50 pl-2 flex items-center text-[11px] font-mono text-slate-700">indent / outdent offset math · ~130 lines pure</div>
+                <div class="h-9 border-l-4 border-slate-300 bg-slate-50 pl-2 flex items-center text-[11px] font-mono text-slate-500">proctoring effects</div>
+                <div class="h-9 border-l-4 border-slate-300 bg-slate-50 pl-2 flex items-center text-[11px] font-mono text-slate-500">data fetch · countdown · state</div>
+                <div class="h-9 border-l-4 border-slate-300 bg-slate-50 pl-2 flex items-center text-[11px] font-mono text-slate-500">render (~600 lines JSX)</div>
+              </div>
+              <p class="mt-3 text-[11px] text-red-600 italic">The riskiest code — offset math — is the least visible. Zero tests.</p>
+            </div>
+
+            <div class="rounded-lg border border-slate-200 bg-white p-4">
+              <p class="text-xs uppercase tracking-wider text-slate-400 mb-3">After — pure engine behind a seam</p>
+              <div class="deep rounded-md p-3 text-slate-100 mb-3">
+                <p class="text-[11px] uppercase tracking-wider text-emerald-300 mb-1 font-semibold">editor-text module</p>
+                <p class="text-[10px] font-mono text-slate-400 leading-relaxed">indent(code, sel) · outdent(code, sel)<br/>highlight(code, lang)</p>
+                <p class="text-[10px] font-mono text-slate-500 mt-2 border-t border-white/10 pt-1.5">pure · string in, string out</p>
+              </div>
+              <div class="space-y-1">
+                <div class="h-8 border-l-4 border-slate-300 bg-slate-50 pl-2 flex items-center text-[11px] font-mono text-slate-500">proctoring effects</div>
+                <div class="h-8 border-l-4 border-slate-300 bg-slate-50 pl-2 flex items-center text-[11px] font-mono text-slate-500">room component (fetch · render)</div>
+              </div>
+              <p class="mt-3 text-[11px] text-slate-500 italic">Component shrinks; offset math gets a test surface.</p>
+            </div>
+          </div>
+
+          <div class="grid md:grid-cols-2 gap-x-8 gap-y-3 text-sm">
+            <p><span class="font-semibold">Problem.</span> The indent/outdent offset math and the syntax highlighter are already pure, but buried in a 1830-line component with no seam and no tests — the exact code where bugs hide.</p>
+            <p><span class="font-semibold">Solution.</span> Move them to an <code class="text-indigo-700">editor-text</code> module — same functions, one interface, isolated from React.</p>
+          </div>
+
+          <ul class="grid sm:grid-cols-2 gap-x-8 gap-y-1.5 text-sm text-slate-700 list-disc pl-5">
+            <li>test surface: offset math, no DOM</li>
+            <li>locality: highlighter grammars in one place</li>
+            <li>AI-navigability: room file drops ~360 lines</li>
+            <li>no behaviour change — pure lift</li>
+          </ul>
+        </article>
+
+        <!-- ============================================================== -->
+        <!-- CANDIDATE 4 — Violation decision                               -->
+        <!-- ============================================================== -->
+        <article id="c4" class="card-anchor space-y-6">
+          <div class="flex items-start justify-between gap-4 flex-wrap">
+            <h2 class="text-2xl font-serif font-semibold">4 · A decision core for the strike / disqualify policy</h2>
+            <div class="flex gap-2 shrink-0">
+              <span class="text-xs font-bold uppercase tracking-wider px-3 py-1 rounded-full bg-amber-100 text-amber-800">Worth exploring</span>
+              <span class="text-xs font-mono px-3 py-1 rounded-full bg-slate-100 text-slate-600">in-process</span>
+            </div>
+          </div>
+
+          <p class="font-mono text-sm text-slate-500">
+            apps/api/src/routes/student.routes.ts&nbsp;·&nbsp;violations&nbsp;(201–302)
+          </p>
+
+          <div class="rounded-lg border border-slate-200 bg-white p-4">
+            <p class="text-xs uppercase tracking-wider text-slate-400 mb-3">Before — policy interleaved with I/O in the handler</p>
+            <pre class="mermaid">
+flowchart LR
+  H[violations handler] --> R[rate-limit query 2s]
+  H --> W[create proctoringLog]
+  H --> C[count TAB+FULLSCREEN]
+  C --> D{count &ge; 3?}
+  D -->|leak| U[update attempt: DISQUALIFIED]
+  H --> L[logApiEvent]
+  classDef leak stroke:#dc2626,stroke-width:2px,fill:#fef2f2;
+  class D,U leak
+            </pre>
+          </div>
+
+          <div class="rounded-lg border border-slate-200 bg-white p-4">
+            <p class="text-xs uppercase tracking-wider text-slate-400 mb-3">After — pure decision, adapter does the writes</p>
+            <pre class="mermaid">
+flowchart LR
+  H[violations handler] -->|snapshot| E["evaluateViolation(type, priorStrikes, now)"]
+  E --> O["Outcome { record?, strikes, disqualify }"]
+  O --> H
+  H --> W[create log / disqualify]
+  style E fill:#0f172a,color:#fff,stroke:#0f172a
+  style O fill:#0f172a,color:#fff,stroke:#0f172a
+            </pre>
+          </div>
+
+          <div class="grid md:grid-cols-2 gap-x-8 gap-y-3 text-sm">
+            <p><span class="font-semibold">Problem.</span> Rate-limit window, strike-counting, and the "3 strikes → disqualify" rule are inlined with Prisma calls — the policy has no test surface and echoes the client's own strike text.</p>
+            <p><span class="font-semibold">Solution.</span> An <code class="text-indigo-700">evaluateViolation</code> core returning a typed Outcome — the same discriminated-result shape as <code>Decision</code> and <code>Refusal</code>.</p>
+          </div>
+
+          <ul class="grid sm:grid-cols-2 gap-x-8 gap-y-1.5 text-sm text-slate-700 list-disc pl-5">
+            <li>disqualification policy becomes a table</li>
+            <li>interface is the test surface</li>
+            <li>consistent with authorize / evaluateSession</li>
+            <li>strike threshold defined once</li>
+          </ul>
+          <div class="rounded-md bg-amber-50 border border-amber-200 px-4 py-2.5 text-sm text-amber-900">
+            <span class="font-semibold">ADR-0004 note.</span> Same shape as Candidate 1 — the disqualify write stays in the handler/adapter; only the <em>decision</em> moves behind the seam.
+          </div>
+        </article>
+
+      </section>
+
+      <!-- ─── Top recommendation ─────────────────────────────────────────── -->
+      <section id="top-recommendation" class="space-y-4">
+        <h2 class="text-xs uppercase tracking-widest text-slate-400 font-semibold">Top recommendation</h2>
+        <a href="#c1" class="block rounded-xl border-2 border-emerald-300 bg-emerald-50/40 p-6 hover:bg-emerald-50 transition-colors">
+          <div class="flex items-center gap-3 mb-2">
+            <span class="text-xs font-bold uppercase tracking-wider px-3 py-1 rounded-full bg-emerald-600 text-white">Start here</span>
+            <h3 class="text-xl font-serif font-semibold">Collapse the submit loop into a Grading module</h3>
+          </div>
+          <p class="text-slate-700 text-sm max-w-3xl">
+            Highest leverage on the domain core: it removes the run/submit duplication, gives the
+            exam-time grading policy a pure test surface for the first time, and turns a 190-line Brain
+            Method into a handler that only loads I/O and writes a response. The deep parts (Judge,
+            scoring, persistence) already exist — this candidate is the missing interface that composes them.
+          </p>
+        </a>
+      </section>
+
+      <footer class="pt-8 text-center text-xs text-slate-400 border-t border-slate-200">
+        Signal, not a gate — deletion test applied to each candidate. Pick one to grill.
+      </footer>
+    </main>
+  </body>
+</html>
