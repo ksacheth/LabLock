@@ -1,0 +1,167 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "LabLock — Runtime Architecture",
+    "locale": "en",
+    "quality_profile": "showcase",
+    "viewBox": [1380, 560],
+    "repository": {
+      "url": "https://github.com/ksacheth/LabLock",
+      "revision": "0b68f937bbb6d01b44861710b8cb4d9200762248"
+    }
+  },
+  "components": [
+    {
+      "id": "users",
+      "type": "external",
+      "label": "Students · Faculty · Admin",
+      "sublabel": "web clients",
+      "pos": [20, 230],
+      "size": [180, 64]
+    },
+    {
+      "id": "web",
+      "type": "frontend",
+      "label": "Next.js Web App",
+      "sublabel": "apps/web · dashboards",
+      "pos": [290, 230],
+      "size": [160, 64],
+      "sources": [
+        { "path": "apps/web/app/lib/auth.ts", "label": "axios client" }
+      ]
+    },
+    {
+      "id": "exam-room",
+      "type": "frontend",
+      "label": "Locked Exam Room",
+      "sublabel": "in-page lockdown",
+      "pos": [290, 400],
+      "size": [160, 64],
+      "sources": [
+        { "path": "apps/web/app/student/exams/[examId]/page.tsx", "label": "lockdown UI" }
+      ]
+    },
+    {
+      "id": "api",
+      "type": "backend",
+      "label": "Express API",
+      "sublabel": "Express on Bun",
+      "pos": [590, 230],
+      "size": [180, 64],
+      "sources": [
+        { "path": "apps/api/src/index.ts", "label": "route registry" }
+      ]
+    },
+    {
+      "id": "judge",
+      "type": "backend",
+      "label": "Judge",
+      "sublabel": "compare · score",
+      "pos": [900, 230],
+      "size": [160, 64],
+      "sources": [
+        { "path": "apps/api/src/execution/judge.ts", "label": "judge()" }
+      ]
+    },
+    {
+      "id": "host-runner",
+      "type": "backend",
+      "label": "Host Runner",
+      "sublabel": "default · child processes",
+      "pos": [900, 70],
+      "size": [160, 64],
+      "sources": [
+        { "path": "apps/api/src/execution/host-runner.ts", "label": "toolchains" }
+      ]
+    },
+    {
+      "id": "sandbox-runner",
+      "type": "backend",
+      "label": "Sandbox Runner",
+      "sublabel": "prod · RUNNER=sandbox",
+      "pos": [900, 400],
+      "size": [160, 64],
+      "sources": [
+        { "path": "apps/api/src/execution/sandbox-runner.ts", "label": "docker adapter" }
+      ]
+    },
+    {
+      "id": "sandbox-image",
+      "type": "security",
+      "label": "Docker Sandbox",
+      "sublabel": "harness.py · read-only rootfs",
+      "pos": [1160, 400],
+      "size": [170, 64],
+      "sources": [
+        { "path": "apps/api/sandbox/Dockerfile", "label": "image" },
+        { "path": "apps/api/sandbox/harness.py", "label": "harness" }
+      ]
+    },
+    {
+      "id": "postgres",
+      "type": "database",
+      "label": "PostgreSQL",
+      "sublabel": "Prisma · packages/database",
+      "pos": [590, 400],
+      "size": [160, 64],
+      "sources": [
+        { "path": "packages/database/prisma/schema.prisma", "label": "schema" }
+      ]
+    }
+  ],
+  "boundaries": [
+    { "kind": "region", "label": "Client — apps/web", "wraps": ["web", "exam-room"] },
+    { "kind": "region", "label": "API host — apps/api", "wraps": ["api", "judge", "host-runner", "sandbox-runner"] },
+    { "kind": "security-group", "label": "Docker isolation", "wraps": ["sandbox-image"] }
+  ],
+  "connections": [
+    { "id": "users-web", "from": "users", "to": "web", "label": "HTTPS", "variant": "emphasis" },
+    { "id": "web-api", "from": "web", "to": "api", "label": "REST · Bearer JWT" },
+    { "id": "web-exam-room", "from": "web", "to": "exam-room", "label": "enter exam", "labelDy": 24 },
+    { "id": "exam-room-api", "from": "exam-room", "to": "api", "label": "run · submit · violations", "variant": "emphasis" },
+    { "id": "api-judge", "from": "api", "to": "judge", "label": "judge()" },
+    { "id": "judge-host-runner", "from": "judge", "to": "host-runner", "label": "spawn toolchains", "fromSide": "top", "toSide": "bottom" },
+    { "id": "judge-sandbox-runner", "from": "judge", "to": "sandbox-runner", "label": "JSON job", "fromSide": "bottom", "toSide": "top", "labelDy": 24 },
+    { "id": "sandbox-runner-image", "from": "sandbox-runner", "to": "sandbox-image", "label": "docker run", "variant": "security" },
+    { "id": "api-postgres", "from": "api", "to": "postgres", "label": "Prisma", "fromSide": "bottom", "toSide": "top" }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "Request pipeline",
+      "items": [
+        "Express 4 on Bun · PORT 4000 · CORS from apps/web",
+        "auth → authorize → rate-limit → openSession on student routes",
+        "Pure decision cores with thin Express/Prisma adapters (ADR-0003..0005)"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "Execution seam",
+      "items": [
+        "judge() is environment-blind: format → run → compare → score",
+        "Host runner (default): gcc/g++/javac/python3 as child processes",
+        "Sandbox runner: one docker run per execution — never falls back to host"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "Failure semantics",
+      "items": [
+        "SYSTEM_ERROR = infra failure → 503 on run, quarantined on submit",
+        "Platform ceiling breach surfaces as an ordinary RUNTIME_ERROR",
+        "Sandbox preflight fails loud at boot (no silent host fallback)"
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "Proctoring",
+      "items": [
+        "In-page lockdown: fullscreen, visibility, copy/paste, 3-strike ban",
+        "Violations POSTed → ProctoringLog with 2s dedup",
+        "3 strikes → ExamAttempt DISQUALIFIED"
+      ]
+    }
+  ]
+}

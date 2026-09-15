@@ -198,7 +198,11 @@ lockdown. Turborepo monorepo (Bun 1.3, split by technical layer, not business do
 The domain glossary is `CONTEXT.md` at the repo root; architectural decisions are
 `docs/adr/0001..0006` (execution Runner seam, `SYSTEM_ERROR` status, authorization,
 exam-session gating, rate limiting, sandbox adapter). Read the relevant ADR before
-touching a seam. Agent/workflow docs live under `docs/agents/`.
+touching a seam. A high-level runtime architecture diagram lives at
+`docs/diagrams/runtime-architecture.html` (generated from the editable Archify spec
+`docs/diagrams/runtime-architecture.json`; regenerate via the archify skill). The DB
+schema diagram lives under `docs/diagrams/`, dated architecture reviews under
+`docs/reviews/`, and agent/workflow docs under `docs/agents/`.
 
 Common tasks run through Turbo from the repo root: `bun run dev | build | lint |
 check-types`, and `db:*` (generate/migrate/push/studio) which delegate to

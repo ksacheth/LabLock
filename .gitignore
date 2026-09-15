@@ -30,8 +30,8 @@ dist
 
 #Claude
 .claude
-
-
+.agents
+.commandcode
 
 # Debug
 npm-debug.log*
