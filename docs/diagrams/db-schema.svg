@@ -1,0 +1,205 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-20 -160 3393 1431.5" width="3393" height="1431.5">
+<rect x="-20" y="-160" width="3393" height="1431.5" fill="#fff"/>
+<defs>
+<marker id="m1971c2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#1971c2"/></marker>
+<marker id="m6741d9" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#6741d9"/></marker>
+<marker id="m2f9e44" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#2f9e44"/></marker>
+<marker id="mf08c00" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#f08c00"/></marker>
+<marker id="m868e96" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#868e96"/></marker>
+</defs>
+<text x="60" y="-105" font-family="Helvetica" font-size="28" font-weight="600" fill="#1e1e1e">LabLock — Database Schema</text>
+<text x="60" y="-72" font-family="Menlo, monospace" font-size="14" fill="#868e96">PostgreSQL via Prisma  ·  packages/database/prisma/schema.prisma  ·  11 models, 18 relations</text>
+<polyline points="310,156.33333333333331 608,219.5" fill="none" stroke="#1971c2" stroke-width="2" marker-end="url(#m1971c2)"/>
+<polyline points="310,212.66666666666666 608,705.75" fill="none" stroke="#1971c2" stroke-width="2" marker-end="url(#m1971c2)"/>
+<polyline points="210,100 210,40 1302.2,40 1302.2,100" fill="none" stroke="#1971c2" stroke-width="2" marker-end="url(#m1971c2)"/>
+<polyline points="802.5,339 815,560" fill="none" stroke="#1971c2" stroke-width="2" marker-end="url(#m1971c2)"/>
+<polyline points="997,219.5 1172,210.75" fill="none" stroke="#1971c2" stroke-width="2" marker-end="url(#m1971c2)"/>
+<polyline points="1022,705.75 1172,657" fill="none" stroke="#1971c2" stroke-width="2" marker-end="url(#m1971c2)"/>
+<polyline points="1375,520 1358,321.5" fill="none" stroke="#6741d9" stroke-width="2" marker-end="url(#m6741d9)"/>
+<polyline points="877.1,851.5 877.1,880 1867.3,880 1867.3,834" fill="none" stroke="#1971c2" stroke-width="2" marker-end="url(#m1971c2)"/>
+<polyline points="752.9,851.5 752.9,915 2425.4,915 2425.4,801.5" fill="none" stroke="#1971c2" stroke-width="2" marker-end="url(#m1971c2)"/>
+<polyline points="1578,702.6666666666666 1728,697" fill="none" stroke="#6741d9" stroke-width="2" marker-end="url(#m6741d9)"/>
+<polyline points="1578,611.3333333333334 1728,210.75" fill="none" stroke="#6741d9" stroke-width="2" marker-end="url(#m6741d9)"/>
+<polyline points="1578,657 1688,657 1688,470 2276,470" fill="none" stroke="#6741d9" stroke-width="2" marker-end="url(#m6741d9)"/>
+<polyline points="2126,651.3333333333334 2276,711.125" fill="none" stroke="#2f9e44" stroke-width="2" marker-end="url(#m2f9e44)"/>
+<polyline points="2126,742.6666666666666 2276,1062" fill="none" stroke="#2f9e44" stroke-width="2" marker-end="url(#m2f9e44)"/>
+<polyline points="2100,173.83333333333331 2276,184.5" fill="none" stroke="#6741d9" stroke-width="2" marker-end="url(#m6741d9)"/>
+<polyline points="2100,247.66666666666666 2276,530.375" fill="none" stroke="#6741d9" stroke-width="2" marker-end="url(#m6741d9)"/>
+<polyline points="2632,184.5 2924,362.1666666666667" fill="none" stroke="#6741d9" stroke-width="2" marker-end="url(#m6741d9)"/>
+<polyline points="2774,620.75 2924,424.3333333333333" fill="none" stroke="#2f9e44" stroke-width="2" marker-end="url(#m2f9e44)"/>
+<rect x="60" y="100" width="250" height="169" fill="#fff" stroke="#1971c2" stroke-width="2"/>
+<rect x="60" y="100" width="250" height="40" fill="#a5d8ff" stroke="#1971c2" stroke-width="2"/>
+<text x="78" y="127" font-family="Helvetica" font-size="18" font-weight="600" fill="#1e1e1e">Department</text>
+<text x="78" y="165" font-family="Menlo, monospace" font-size="14" fill="#343a40" xml:space="preserve">id         uuid      PK</text>
+<text x="78" y="182.5" font-family="Menlo, monospace" font-size="14" fill="#343a40" xml:space="preserve">name       string    UQ</text>
+<text x="78" y="200" font-family="Menlo, monospace" font-size="14" fill="#343a40" xml:space="preserve">code       string    UQ</text>
+<text x="78" y="217.5" font-family="Menlo, monospace" font-size="14" fill="#343a40" xml:space="preserve">isActive   bool</text>
+<text x="78" y="235" font-family="Menlo, monospace" font-size="14" fill="#343a40" xml:space="preserve">createdAt  datetime</text>
+<text x="78" y="252.5" font-family="Menlo, monospace" font-size="14" fill="#343a40" xml:space="preserve">updatedAt  datetime</text>
+<rect x="608" y="100" width="389" height="239" fill="#fff" stroke="#1971c2" stroke-width="2"/>
+<rect x="608" y="100" width="389" height="40" fill="#a5d8ff" stroke="#1971c2" stroke-width="2"/>
+<text x="626" y="127" font-family="Helvetica" font-size="18" font-weight="600" fill="#1e1e1e">Batch</text>
+<text x="626" y="165" font-family="Menlo, monospace" font-size="14" fill="#343a40" xml:space="preserve">id            uuid      PK</text>
+<text x="626" y="182.5" font-family="Menlo, monospace" font-size="14" fill="#343a40" xml:space="preserve">departmentId  uuid      FK -&gt; Department</text>
+<text x="626" y="200" font-family="Menlo, monospace" font-size="14" fill="#343a40" xml:space="preserve">yearOfStudy   int</text>
+<text x="626" y="217.5" font-family="Menlo, monospace" font-size="14" fill="#343a40" xml:space="preserve">intakeYear    int</text>
+<text x="626" y="235" font-family="Menlo, monospace" font-size="14" fill="#343a40" xml:space="preserve">label         string</text>
+<text x="626" y="252.5" font-family="Menlo, monospace" font-size="14" fill="#343a40" xml:space="preserve">isActive      bool</text>
+<text x="626" y="270" font-family="Menlo, monospace" font-size="14" fill="#343a40" xml:space="preserve">createdAt     datetime</text>
+<text x="626" y="287.5" font-family="Menlo, monospace" font-size="14" fill="#343a40" xml:space="preserve">updatedAt     datetime</text>
+<text x="626" y="305" font-family="Menlo, monospace" font-size="14" fill="#343a40" xml:space="preserve"></text>
+<text x="626" y="322.5" font-family="Menlo, monospace" font-size="14" fill="#343a40" xml:space="preserve">UQ (departmentId, yearOfStudy, intakeYear)</text>
+<rect x="608" y="560" width="414" height="291.5" fill="#fff" stroke="#1971c2" stroke-width="2"/>
+<rect x="608" y="560" width="414" height="40" fill="#a5d8ff" stroke="#1971c2" stroke-width="2"/>
+<text x="626" y="587" font-family="Helvetica" font-size="18" font-weight="600" fill="#1e1e1e">User</text>
+<text x="626" y="625" font-family="Menlo, monospace" font-size="14" fill="#343a40" xml:space="preserve">id               uuid      PK</text>
+<text x="626" y="642.5" font-family="Menlo, monospace" font-size="14" fill="#343a40" xml:space="preserve">email            string    UQ</text>
+<text x="626" y="660" font-family="Menlo, monospace" font-size="14" fill="#343a40" xml:space="preserve">name             string</text>
+<text x="626" y="677.5" font-family="Menlo, monospace" font-size="14" fill="#343a40" xml:space="preserve">password         string    hashed</text>
+<text x="626" y="695" font-family="Menlo, monospace" font-size="14" fill="#343a40" xml:space="preserve">role             UserRole  enum</text>
+<text x="626" y="712.5" font-family="Menlo, monospace" font-size="14" fill="#343a40" xml:space="preserve">departmentId     uuid?     FK -&gt; Department</text>
+<text x="626" y="730" font-family="Menlo, monospace" font-size="14" fill="#343a40" xml:space="preserve">batchId          uuid?     FK -&gt; Batch</text>
+<text x="626" y="747.5" font-family="Menlo, monospace" font-size="14" fill="#343a40" xml:space="preserve">rollNumber       string?   UQ</text>
+<text x="626" y="765" font-family="Menlo, monospace" font-size="14" fill="#343a40" xml:space="preserve">facultyApproved  bool      admin gate</text>
+<text x="626" y="782.5" font-family="Menlo, monospace" font-size="14" fill="#343a40" xml:space="preserve">createdAt        datetime</text>
+<text x="626" y="800" font-family="Menlo, monospace" font-size="14" fill="#343a40" xml:space="preserve">updatedAt        datetime</text>
+<text x="626" y="817.5" font-family="Menlo, monospace" font-size="14" fill="#343a40" xml:space="preserve"></text>
+<text x="626" y="835" font-family="Menlo, monospace" font-size="14" fill="#343a40" xml:space="preserve">dept + batch required for STUDENT (app-level)</text>
+<rect x="1172" y="100" width="372" height="221.5" fill="#fff" stroke="#6741d9" stroke-width="2"/>
+<rect x="1172" y="100" width="372" height="40" fill="#d0bfff" stroke="#6741d9" stroke-width="2"/>
+<text x="1190" y="127" font-family="Helvetica" font-size="18" font-weight="600" fill="#1e1e1e">ExamEligibility</text>
+<text x="1190" y="165" font-family="Menlo, monospace" font-size="14" fill="#343a40" xml:space="preserve">id            uuid      PK</text>
+<text x="1190" y="182.5" font-family="Menlo, monospace" font-size="14" fill="#343a40" xml:space="preserve">examId        uuid      FK -&gt; Exam</text>
+<text x="1190" y="200" font-family="Menlo, monospace" font-size="14" fill="#343a40" xml:space="preserve">batchId       uuid?     FK -&gt; Batch</text>
+<text x="1190" y="217.5" font-family="Menlo, monospace" font-size="14" fill="#343a40" xml:space="preserve">departmentId  uuid?     FK -&gt; Department</text>
+<text x="1190" y="235" font-family="Menlo, monospace" font-size="14" fill="#343a40" xml:space="preserve">note          string?</text>
+<text x="1190" y="252.5" font-family="Menlo, monospace" font-size="14" fill="#343a40" xml:space="preserve">createdAt     datetime</text>
+<text x="1190" y="270" font-family="Menlo, monospace" font-size="14" fill="#343a40" xml:space="preserve"></text>
+<text x="1190" y="287.5" font-family="Menlo, monospace" font-size="14" fill="#343a40" xml:space="preserve">UQ (examId, batchId, departmentId)</text>
+<text x="1190" y="305" font-family="Menlo, monospace" font-size="14" fill="#343a40" xml:space="preserve">rows are OR-ed; &gt;=1 target required</text>
+<rect x="1172" y="520" width="406" height="274" fill="#fff" stroke="#6741d9" stroke-width="2"/>
+<rect x="1172" y="520" width="406" height="40" fill="#d0bfff" stroke="#6741d9" stroke-width="2"/>
+<text x="1190" y="547" font-family="Helvetica" font-size="18" font-weight="600" fill="#1e1e1e">Exam</text>
+<text x="1190" y="585" font-family="Menlo, monospace" font-size="14" fill="#343a40" xml:space="preserve">id           uuid       PK</text>
+<text x="1190" y="602.5" font-family="Menlo, monospace" font-size="14" fill="#343a40" xml:space="preserve">title        string</text>
+<text x="1190" y="620" font-family="Menlo, monospace" font-size="14" fill="#343a40" xml:space="preserve">description  string?</text>
+<text x="1190" y="637.5" font-family="Menlo, monospace" font-size="14" fill="#343a40" xml:space="preserve">startTime    datetime</text>
+<text x="1190" y="655" font-family="Menlo, monospace" font-size="14" fill="#343a40" xml:space="preserve">endTime      datetime</text>
+<text x="1190" y="672.5" font-family="Menlo, monospace" font-size="14" fill="#343a40" xml:space="preserve">durationMin  int</text>
+<text x="1190" y="690" font-family="Menlo, monospace" font-size="14" fill="#343a40" xml:space="preserve">isActive     bool</text>
+<text x="1190" y="707.5" font-family="Menlo, monospace" font-size="14" fill="#343a40" xml:space="preserve">accessCode   string?</text>
+<text x="1190" y="725" font-family="Menlo, monospace" font-size="14" fill="#343a40" xml:space="preserve">creatorId    uuid       FK -&gt; User (faculty)</text>
+<text x="1190" y="742.5" font-family="Menlo, monospace" font-size="14" fill="#343a40" xml:space="preserve">createdAt    datetime</text>
+<text x="1190" y="760" font-family="Menlo, monospace" font-size="14" fill="#343a40" xml:space="preserve">updatedAt    datetime</text>
+<text x="1190" y="777.5" font-family="Menlo, monospace" font-size="14" fill="#343a40" xml:space="preserve">deletedAt    datetime?  soft delete</text>
+<rect x="1728" y="100" width="372" height="221.5" fill="#fff" stroke="#6741d9" stroke-width="2"/>
+<rect x="1728" y="100" width="372" height="40" fill="#d0bfff" stroke="#6741d9" stroke-width="2"/>
+<text x="1746" y="127" font-family="Helvetica" font-size="18" font-weight="600" fill="#1e1e1e">Question</text>
+<text x="1746" y="165" font-family="Menlo, monospace" font-size="14" fill="#343a40" xml:space="preserve">id             uuid       PK</text>
+<text x="1746" y="182.5" font-family="Menlo, monospace" font-size="14" fill="#343a40" xml:space="preserve">examId         uuid       FK -&gt; Exam</text>
+<text x="1746" y="200" font-family="Menlo, monospace" font-size="14" fill="#343a40" xml:space="preserve">title          string</text>
+<text x="1746" y="217.5" font-family="Menlo, monospace" font-size="14" fill="#343a40" xml:space="preserve">description    string</text>
+<text x="1746" y="235" font-family="Menlo, monospace" font-size="14" fill="#343a40" xml:space="preserve">marks          float      default 10</text>
+<text x="1746" y="252.5" font-family="Menlo, monospace" font-size="14" fill="#343a40" xml:space="preserve">timeLimitMs    int        default 2000</text>
+<text x="1746" y="270" font-family="Menlo, monospace" font-size="14" fill="#343a40" xml:space="preserve">memoryLimitKb  int        default 256000</text>
+<text x="1746" y="287.5" font-family="Menlo, monospace" font-size="14" fill="#343a40" xml:space="preserve">orderIndex     int</text>
+<text x="1746" y="305" font-family="Menlo, monospace" font-size="14" fill="#343a40" xml:space="preserve">deletedAt      datetime?  soft delete</text>
+<rect x="1728" y="560" width="398" height="274" fill="#fff" stroke="#2f9e44" stroke-width="2"/>
+<rect x="1728" y="560" width="398" height="40" fill="#b2f2bb" stroke="#2f9e44" stroke-width="2"/>
+<text x="1746" y="587" font-family="Helvetica" font-size="18" font-weight="600" fill="#1e1e1e">ExamAttempt</text>
+<text x="1746" y="625" font-family="Menlo, monospace" font-size="14" fill="#343a40" xml:space="preserve">id            uuid               PK</text>
+<text x="1746" y="642.5" font-family="Menlo, monospace" font-size="14" fill="#343a40" xml:space="preserve">userId        uuid               FK -&gt; User</text>
+<text x="1746" y="660" font-family="Menlo, monospace" font-size="14" fill="#343a40" xml:space="preserve">examId        uuid               FK -&gt; Exam</text>
+<text x="1746" y="677.5" font-family="Menlo, monospace" font-size="14" fill="#343a40" xml:space="preserve">status        ExamAttemptStatus  enum</text>
+<text x="1746" y="695" font-family="Menlo, monospace" font-size="14" fill="#343a40" xml:space="preserve">score         float?</text>
+<text x="1746" y="712.5" font-family="Menlo, monospace" font-size="14" fill="#343a40" xml:space="preserve">gradedAt      datetime?</text>
+<text x="1746" y="730" font-family="Menlo, monospace" font-size="14" fill="#343a40" xml:space="preserve">retakeNumber  int                default 1</text>
+<text x="1746" y="747.5" font-family="Menlo, monospace" font-size="14" fill="#343a40" xml:space="preserve">startedAt     datetime?</text>
+<text x="1746" y="765" font-family="Menlo, monospace" font-size="14" fill="#343a40" xml:space="preserve">completedAt   datetime?</text>
+<text x="1746" y="782.5" font-family="Menlo, monospace" font-size="14" fill="#343a40" xml:space="preserve">ipAddress     string?</text>
+<text x="1746" y="800" font-family="Menlo, monospace" font-size="14" fill="#343a40" xml:space="preserve"></text>
+<text x="1746" y="817.5" font-family="Menlo, monospace" font-size="14" fill="#343a40" xml:space="preserve">UQ (userId, examId, retakeNumber)</text>
+<rect x="2276" y="100" width="356" height="169" fill="#fff" stroke="#6741d9" stroke-width="2"/>
+<rect x="2276" y="100" width="356" height="40" fill="#d0bfff" stroke="#6741d9" stroke-width="2"/>
+<text x="2294" y="127" font-family="Helvetica" font-size="18" font-weight="600" fill="#1e1e1e">TestCase</text>
+<text x="2294" y="165" font-family="Menlo, monospace" font-size="14" fill="#343a40" xml:space="preserve">id              uuid    PK</text>
+<text x="2294" y="182.5" font-family="Menlo, monospace" font-size="14" fill="#343a40" xml:space="preserve">questionId      uuid    FK -&gt; Question</text>
+<text x="2294" y="200" font-family="Menlo, monospace" font-size="14" fill="#343a40" xml:space="preserve">input           string</text>
+<text x="2294" y="217.5" font-family="Menlo, monospace" font-size="14" fill="#343a40" xml:space="preserve">expectedOutput  string</text>
+<text x="2294" y="235" font-family="Menlo, monospace" font-size="14" fill="#343a40" xml:space="preserve">isHidden        bool    default true</text>
+<text x="2294" y="252.5" font-family="Menlo, monospace" font-size="14" fill="#343a40" xml:space="preserve">weight          float   default 1.0</text>
+<rect x="2276" y="440" width="498" height="361.5" fill="#fff" stroke="#2f9e44" stroke-width="2"/>
+<rect x="2276" y="440" width="498" height="40" fill="#b2f2bb" stroke="#2f9e44" stroke-width="2"/>
+<text x="2294" y="467" font-family="Helvetica" font-size="18" font-weight="600" fill="#1e1e1e">Submission</text>
+<text x="2294" y="505" font-family="Menlo, monospace" font-size="14" fill="#343a40" xml:space="preserve">id               uuid                 PK</text>
+<text x="2294" y="522.5" font-family="Menlo, monospace" font-size="14" fill="#343a40" xml:space="preserve">attemptId        uuid                 FK -&gt; ExamAttempt</text>
+<text x="2294" y="540" font-family="Menlo, monospace" font-size="14" fill="#343a40" xml:space="preserve">userId           uuid                 FK -&gt; User</text>
+<text x="2294" y="557.5" font-family="Menlo, monospace" font-size="14" fill="#343a40" xml:space="preserve">examId           uuid                 FK -&gt; Exam</text>
+<text x="2294" y="575" font-family="Menlo, monospace" font-size="14" fill="#343a40" xml:space="preserve">questionId       uuid                 FK -&gt; Question</text>
+<text x="2294" y="592.5" font-family="Menlo, monospace" font-size="14" fill="#343a40" xml:space="preserve">code             string</text>
+<text x="2294" y="610" font-family="Menlo, monospace" font-size="14" fill="#343a40" xml:space="preserve">language         ProgrammingLanguage  enum</text>
+<text x="2294" y="627.5" font-family="Menlo, monospace" font-size="14" fill="#343a40" xml:space="preserve">status           SubmissionStatus     enum</text>
+<text x="2294" y="645" font-family="Menlo, monospace" font-size="14" fill="#343a40" xml:space="preserve">executionTimeMs  int?</text>
+<text x="2294" y="662.5" font-family="Menlo, monospace" font-size="14" fill="#343a40" xml:space="preserve">memoryUsedKb     int?</text>
+<text x="2294" y="680" font-family="Menlo, monospace" font-size="14" fill="#343a40" xml:space="preserve">passedCount      int                  default 0</text>
+<text x="2294" y="697.5" font-family="Menlo, monospace" font-size="14" fill="#343a40" xml:space="preserve">totalCount       int                  default 0</text>
+<text x="2294" y="715" font-family="Menlo, monospace" font-size="14" fill="#343a40" xml:space="preserve">stdErr           string?</text>
+<text x="2294" y="732.5" font-family="Menlo, monospace" font-size="14" fill="#343a40" xml:space="preserve">submittedAt      datetime</text>
+<text x="2294" y="750" font-family="Menlo, monospace" font-size="14" fill="#343a40" xml:space="preserve"></text>
+<text x="2294" y="767.5" font-family="Menlo, monospace" font-size="14" fill="#343a40" xml:space="preserve">IX (attemptId, questionId)</text>
+<text x="2294" y="785" font-family="Menlo, monospace" font-size="14" fill="#343a40" xml:space="preserve">IX (userId, questionId)</text>
+<rect x="2276" y="960" width="431" height="204" fill="#fff" stroke="#f08c00" stroke-width="2"/>
+<rect x="2276" y="960" width="431" height="40" fill="#ffec99" stroke="#f08c00" stroke-width="2"/>
+<text x="2294" y="987" font-family="Helvetica" font-size="18" font-weight="600" fill="#1e1e1e">ProctoringLog</text>
+<text x="2294" y="1025" font-family="Menlo, monospace" font-size="14" fill="#343a40" xml:space="preserve">id             uuid           PK</text>
+<text x="2294" y="1042.5" font-family="Menlo, monospace" font-size="14" fill="#343a40" xml:space="preserve">attemptId      uuid           FK -&gt; ExamAttempt</text>
+<text x="2294" y="1060" font-family="Menlo, monospace" font-size="14" fill="#343a40" xml:space="preserve">violationType  ViolationType  enum</text>
+<text x="2294" y="1077.5" font-family="Menlo, monospace" font-size="14" fill="#343a40" xml:space="preserve">details        string?</text>
+<text x="2294" y="1095" font-family="Menlo, monospace" font-size="14" fill="#343a40" xml:space="preserve">snapshotUrl    string?</text>
+<text x="2294" y="1112.5" font-family="Menlo, monospace" font-size="14" fill="#343a40" xml:space="preserve">timestamp      datetime</text>
+<text x="2294" y="1130" font-family="Menlo, monospace" font-size="14" fill="#343a40" xml:space="preserve"></text>
+<text x="2294" y="1147.5" font-family="Menlo, monospace" font-size="14" fill="#343a40" xml:space="preserve">IX (attemptId)</text>
+<rect x="2924" y="300" width="389" height="186.5" fill="#fff" stroke="#2f9e44" stroke-width="2"/>
+<rect x="2924" y="300" width="389" height="40" fill="#b2f2bb" stroke="#2f9e44" stroke-width="2"/>
+<text x="2942" y="327" font-family="Helvetica" font-size="18" font-weight="600" fill="#1e1e1e">SubmissionTestCaseResult</text>
+<text x="2942" y="365" font-family="Menlo, monospace" font-size="14" fill="#343a40" xml:space="preserve">id               uuid     PK</text>
+<text x="2942" y="382.5" font-family="Menlo, monospace" font-size="14" fill="#343a40" xml:space="preserve">submissionId     uuid     FK -&gt; Submission</text>
+<text x="2942" y="400" font-family="Menlo, monospace" font-size="14" fill="#343a40" xml:space="preserve">testCaseId       uuid     FK -&gt; TestCase</text>
+<text x="2942" y="417.5" font-family="Menlo, monospace" font-size="14" fill="#343a40" xml:space="preserve">passed           bool</text>
+<text x="2942" y="435" font-family="Menlo, monospace" font-size="14" fill="#343a40" xml:space="preserve">actualOutput     string?</text>
+<text x="2942" y="452.5" font-family="Menlo, monospace" font-size="14" fill="#343a40" xml:space="preserve">executionTimeMs  int?</text>
+<text x="2942" y="470" font-family="Menlo, monospace" font-size="14" fill="#343a40" xml:space="preserve">memoryUsedKb     int?</text>
+<rect x="60" y="560" width="347" height="449" fill="#fff" stroke="#868e96" stroke-width="2"/>
+<rect x="60" y="560" width="347" height="40" fill="#e9ecef" stroke="#868e96" stroke-width="2"/>
+<text x="78" y="587" font-family="Helvetica" font-size="18" font-weight="600" fill="#1e1e1e">Enums</text>
+<text x="78" y="625" font-family="Menlo, monospace" font-size="14" fill="#343a40" xml:space="preserve">UserRole</text>
+<text x="78" y="642.5" font-family="Menlo, monospace" font-size="14" fill="#343a40" xml:space="preserve">  STUDENT | FACULTY | ADMIN</text>
+<text x="78" y="660" font-family="Menlo, monospace" font-size="14" fill="#343a40" xml:space="preserve"></text>
+<text x="78" y="677.5" font-family="Menlo, monospace" font-size="14" fill="#343a40" xml:space="preserve">ExamAttemptStatus</text>
+<text x="78" y="695" font-family="Menlo, monospace" font-size="14" fill="#343a40" xml:space="preserve">  ENROLLED | IN_PROGRESS</text>
+<text x="78" y="712.5" font-family="Menlo, monospace" font-size="14" fill="#343a40" xml:space="preserve">  COMPLETED | DISQUALIFIED</text>
+<text x="78" y="730" font-family="Menlo, monospace" font-size="14" fill="#343a40" xml:space="preserve"></text>
+<text x="78" y="747.5" font-family="Menlo, monospace" font-size="14" fill="#343a40" xml:space="preserve">SubmissionStatus</text>
+<text x="78" y="765" font-family="Menlo, monospace" font-size="14" fill="#343a40" xml:space="preserve">  PENDING | ACCEPTED | WRONG_ANSWER</text>
+<text x="78" y="782.5" font-family="Menlo, monospace" font-size="14" fill="#343a40" xml:space="preserve">  COMPILE_ERROR | RUNTIME_ERROR</text>
+<text x="78" y="800" font-family="Menlo, monospace" font-size="14" fill="#343a40" xml:space="preserve">  TIME_LIMIT_EXCEEDED</text>
+<text x="78" y="817.5" font-family="Menlo, monospace" font-size="14" fill="#343a40" xml:space="preserve">  MEMORY_LIMIT_EXCEEDED</text>
+<text x="78" y="835" font-family="Menlo, monospace" font-size="14" fill="#343a40" xml:space="preserve">  SYSTEM_ERROR  (infra, re-run)</text>
+<text x="78" y="852.5" font-family="Menlo, monospace" font-size="14" fill="#343a40" xml:space="preserve"></text>
+<text x="78" y="870" font-family="Menlo, monospace" font-size="14" fill="#343a40" xml:space="preserve">ViolationType</text>
+<text x="78" y="887.5" font-family="Menlo, monospace" font-size="14" fill="#343a40" xml:space="preserve">  TAB_SWITCH | FULLSCREEN_EXIT</text>
+<text x="78" y="905" font-family="Menlo, monospace" font-size="14" fill="#343a40" xml:space="preserve">  COPY_PASTE | MULTIPLE_FACES</text>
+<text x="78" y="922.5" font-family="Menlo, monospace" font-size="14" fill="#343a40" xml:space="preserve">  NO_FACE | OTHER</text>
+<text x="78" y="940" font-family="Menlo, monospace" font-size="14" fill="#343a40" xml:space="preserve"></text>
+<text x="78" y="957.5" font-family="Menlo, monospace" font-size="14" fill="#343a40" xml:space="preserve">ProgrammingLanguage</text>
+<text x="78" y="975" font-family="Menlo, monospace" font-size="14" fill="#343a40" xml:space="preserve">  C | CPP | JAVA | PYTHON3</text>
+<text x="78" y="992.5" font-family="Menlo, monospace" font-size="14" fill="#343a40" xml:space="preserve">  JAVASCRIPT | TYPESCRIPT | GO | RUST</text>
+<rect x="60" y="1060" width="398" height="151.5" fill="#fff" stroke="#868e96" stroke-width="2"/>
+<rect x="60" y="1060" width="398" height="40" fill="#e9ecef" stroke="#868e96" stroke-width="2"/>
+<text x="78" y="1087" font-family="Helvetica" font-size="18" font-weight="600" fill="#1e1e1e">Legend</text>
+<text x="78" y="1125" font-family="Menlo, monospace" font-size="14" fill="#343a40" xml:space="preserve">arrow   one (parent)  -&gt;  many (child)</text>
+<text x="78" y="1142.5" font-family="Menlo, monospace" font-size="14" fill="#343a40" xml:space="preserve">?       nullable column</text>
+<text x="78" y="1160" font-family="Menlo, monospace" font-size="14" fill="#343a40" xml:space="preserve">PK / FK primary key / foreign key</text>
+<text x="78" y="1177.5" font-family="Menlo, monospace" font-size="14" fill="#343a40" xml:space="preserve">UQ / IX unique constraint / index</text>
+<text x="78" y="1195" font-family="Menlo, monospace" font-size="14" fill="#343a40" xml:space="preserve">colour  identity | exam | attempt | proctor</text>
+</svg>
