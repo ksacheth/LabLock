@@ -28,10 +28,12 @@ out/
 build
 dist
 
-#Claude
+# Agent tooling (local-only)
 .claude
 .agents
 .commandcode
+AGENTS.md
+skills-lock.json
 
 # Debug
 npm-debug.log*

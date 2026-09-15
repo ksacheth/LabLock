@@ -207,4 +207,3 @@ bun run check-types   # tsc / next typegen across all workspaces
 | [`docs/adr/`](./docs/adr/) | six architecture decision records (Runner, `SYSTEM_ERROR`, authorization, exam-session, rate limiting, sandbox) |
 | [`docs/diagrams/`](./docs/diagrams/) | runtime architecture and database schema diagrams |
 | [`docs/reviews/`](./docs/reviews/) | dated architecture reviews |
-| [`AGENTS.md`](./AGENTS.md) | the DOX contract tree for agent-assisted work in this repo |
